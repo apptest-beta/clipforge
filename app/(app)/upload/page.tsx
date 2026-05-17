@@ -1,5 +1,5 @@
 'use client'
-
+import { CldUploadWidget } from 'next-cloudinary'
 import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
@@ -122,7 +122,7 @@ export default function UploadPage() {
     setIsUploading(true)
     setUploadProgress(0)
 
-    // Simulate upload progress
+    // Simulate upload progresss
     const interval = setInterval(() => {
       setUploadProgress((prev) => {
         if (prev >= 100) {
