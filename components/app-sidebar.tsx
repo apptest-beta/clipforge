@@ -1,12 +1,14 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Logo } from './logo'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { Upload, Film, Download, Settings, Plus } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 const navItems = [
   { href: '/dashboard', label: 'My Clips', icon: Film },
@@ -15,14 +17,79 @@ const navItems = [
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
-const recentClips = [
-  { id: '1', name: 'Valorant Clutch 1v4', status: 'ready' },
-  { id: '2', name: 'Fortnite Victory', status: 'processing' },
-  { id: '3', name: 'CS2 Ace', status: 'ready' },
-]
+type RecentClip = {
+  id: string
+  video_id: string
+  label: string
+  ready: boolean
+}
+
+function formatLabel(game: string | null | undefined, moment: string | null | undefined) {
+  const g = (game || '').trim()
+  const m = (moment || '').trim()
+  if (g && m) return `${g} - ${m}`
+  return g || m || 'Clip'
+}
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const [recent, setRecent] = useState<RecentClip[]>([])
+  const [loadingRecent, setLoadingRecent] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadRecent() {
+      const { data: userData } = await supabase.auth.getUser()
+      const user = userData?.user
+      if (!user) {
+        if (!cancelled) {
+          setRecent([])
+          setLoadingRecent(false)
+        }
+        return
+      }
+
+      // Newest clips first, joined with parent video for the game label.
+      // Inner-join filters to clips whose parent video belongs to this user.
+      const { data, error } = await supabase
+        .from('clips')
+        .select('id, video_id, moment_type, clip_url, videos!inner(game, user_id)')
+        .eq('videos.user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      if (cancelled) return
+
+      if (error || !data) {
+        setRecent([])
+        setLoadingRecent(false)
+        return
+      }
+
+      const mapped: RecentClip[] = data.map((row: any) => {
+        const game = Array.isArray(row.videos) ? row.videos[0]?.game : row.videos?.game
+        return {
+          id: String(row.id),
+          video_id: String(row.video_id),
+          label: formatLabel(game, row.moment_type),
+          ready: Boolean(row.clip_url),
+        }
+      })
+
+      setRecent(mapped)
+      setLoadingRecent(false)
+    }
+
+    loadRecent()
+    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+      loadRecent()
+    })
+    return () => {
+      cancelled = true
+      sub.subscription.unsubscribe()
+    }
+  }, [pathname])
 
   return (
     <motion.aside
@@ -64,33 +131,38 @@ export function AppSidebar() {
             Recent Clips
           </h3>
           <div className="space-y-1">
-            {recentClips.map((clip) => (
-              <Link
-                key={clip.id}
-                href={`/editor/${clip.id}`}
-                className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-all hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-              >
+            {loadingRecent ? (
+              Array.from({ length: 3 }).map((_, i) => (
                 <div
-                  className={cn(
-                    'h-2 w-2 rounded-full',
-                    clip.status === 'ready' ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'
-                  )}
-                />
-                <span className="truncate">{clip.name}</span>
-              </Link>
-            ))}
+                  key={i}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2"
+                >
+                  <Skeleton className="h-2 w-2 rounded-full" />
+                  <Skeleton className="h-3 flex-1" />
+                </div>
+              ))
+            ) : recent.length === 0 ? (
+              <p className="px-3 py-2 text-xs text-muted-foreground">
+                No clips yet
+              </p>
+            ) : (
+              recent.map((clip) => (
+                <Link
+                  key={clip.id}
+                  href={`/clips/${clip.video_id}`}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-all hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                >
+                  <div
+                    className={cn(
+                      'h-2 w-2 shrink-0 rounded-full',
+                      clip.ready ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'
+                    )}
+                  />
+                  <span className="truncate capitalize">{clip.label}</span>
+                </Link>
+              ))
+            )}
           </div>
-        </div>
-
-        <div className="mt-auto rounded-lg border border-border bg-card p-4">
-          <div className="mb-2 text-sm font-medium">Free Plan</div>
-          <div className="mb-3 text-xs text-muted-foreground">18 min / 30 min used</div>
-          <div className="mb-3 h-2 overflow-hidden rounded-full bg-secondary">
-            <div className="gradient-bg h-full w-[60%] transition-all" />
-          </div>
-          <Button variant="outline" size="sm" className="w-full gradient-border" asChild>
-            <Link href="#pricing">Upgrade</Link>
-          </Button>
         </div>
       </div>
     </motion.aside>

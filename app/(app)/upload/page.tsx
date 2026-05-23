@@ -1,5 +1,4 @@
 'use client'
-import { CldUploadWidget } from 'next-cloudinary'
 import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
@@ -83,7 +82,7 @@ export default function UploadPage() {
     if (droppedFile && isValidFile(droppedFile)) {
       setFile(droppedFile)
     } else {
-      toast.error('Invalid file type. Please upload MP4, MOV, or AVI files.')
+      toast.error('Invalid file type. Please upload MP4, MOV, WEBM, MKV, or AVI files.')
     }
   }, [])
 
@@ -92,13 +91,22 @@ export default function UploadPage() {
     if (selectedFile && isValidFile(selectedFile)) {
       setFile(selectedFile)
     } else if (selectedFile) {
-      toast.error('Invalid file type. Please upload MP4, MOV, or AVI files.')
+      toast.error('Invalid file type. Please upload MP4, MOV, WEBM, MKV, or AVI files.')
     }
   }, [])
 
   const isValidFile = (file: File) => {
-    const validTypes = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/avi']
-    return validTypes.includes(file.type) || file.name.match(/\.(mp4|mov|avi)$/i)
+    // Keep this in sync with the rest of the pipeline - the cut + analyze
+    // routes already handle .webm and .mkv, so accept them at the gate too.
+    const validTypes = [
+      'video/mp4',
+      'video/quicktime',
+      'video/x-msvideo',
+      'video/avi',
+      'video/webm',
+      'video/x-matroska',
+    ]
+    return validTypes.includes(file.type) || /\.(mp4|mov|avi|webm|mkv)$/i.test(file.name)
   }
 
   const formatFileSize = (bytes: number) => {
@@ -122,26 +130,52 @@ export default function UploadPage() {
     setIsUploading(true)
     setUploadProgress(0)
 
-    // Simulate upload progresss
-    const interval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          return 100
-        }
-        return prev + Math.random() * 10
-      })
-    }, 300)
+    try {
+      // Step 1: Upload to Cloudinary through our API route
+      const formData = new FormData()
+      formData.append('file', file)
 
-    // Simulate upload completion
-    setTimeout(() => {
-      clearInterval(interval)
+      const cloudinaryResponse = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!cloudinaryResponse.ok) {
+        throw new Error('Cloudinary upload failed')
+      }
+
+      const cloudinaryData = await cloudinaryResponse.json()
+      setUploadProgress(50)
+
+      // Step 2: Send to analyze API with real URL
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: file.name,
+          fileUrl: cloudinaryData.secure_url,
+          // Cloudinary returns duration (in seconds) on the upload response;
+          // analyze uses it to bump the user usage_minutes counter.
+          durationSec: cloudinaryData.duration ?? null,
+          game,
+          momentTypes: selectedMoments
+        })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Analysis failed')
+      }
+
+      const result = await response.json()
       setUploadProgress(100)
-      toast.success('Upload complete! Processing your video...')
-      setTimeout(() => {
-        router.push('/dashboard')
-      }, 1000)
-    }, 4000)
+      toast.success('Analysis complete!')
+      setTimeout(() => router.push('/dashboard'), 1000)
+    } catch (error) {
+      console.error('Upload error:', error)
+      toast.error(error instanceof Error ? error.message : 'Upload failed. Please try again.')
+      setIsUploading(false)
+    }
   }
 
   const removeFile = () => {
@@ -188,7 +222,7 @@ export default function UploadPage() {
                 >
                   <input
                     type="file"
-                    accept=".mp4,.mov,.avi,video/mp4,video/quicktime,video/x-msvideo"
+                    accept=".mp4,.mov,.avi,.webm,.mkv,video/mp4,video/quicktime,video/x-msvideo,video/webm,video/x-matroska"
                     onChange={handleFileSelect}
                     className="absolute inset-0 cursor-pointer opacity-0"
                   />
@@ -205,6 +239,8 @@ export default function UploadPage() {
                   <div className="flex flex-wrap justify-center gap-2">
                     <Badge variant="outline">.mp4</Badge>
                     <Badge variant="outline">.mov</Badge>
+                    <Badge variant="outline">.webm</Badge>
+                    <Badge variant="outline">.mkv</Badge>
                     <Badge variant="outline">.avi</Badge>
                     <Badge variant="outline">up to 10GB</Badge>
                   </div>
@@ -238,9 +274,7 @@ export default function UploadPage() {
                         <span className="font-medium">{Math.round(uploadProgress)}%</span>
                       </div>
                       <Progress value={uploadProgress} className="h-2" />
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        Estimated time remaining: {Math.max(1, Math.round((100 - uploadProgress) / 10))} seconds
-                      </p>
+                      <p className="mt-2 text-xs text-muted-foreground">Processing...</p>
                     </div>
                   )}
                 </motion.div>

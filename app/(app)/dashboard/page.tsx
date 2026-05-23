@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { VideoCard, VideoCardProps } from '@/components/video-card'
@@ -14,79 +14,191 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Upload, Search, Grid3x3, List, Film } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
+import { supabase } from '@/lib/supabase'
+import { cleanFilename } from '@/lib/utils'
+import { toast } from 'sonner'
 
-const mockVideos: VideoCardProps[] = [
-  {
-    id: '1',
-    title: 'Valorant Ranked Grind - Diamond Push',
-    thumbnail: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800&h=450&fit=crop',
-    duration: '2:34:12',
-    status: 'ready',
-    clipsFound: 12,
-    game: 'Valorant',
-  },
-  {
-    id: '2',
-    title: 'Fortnite Solo Victory Royale Streak',
-    thumbnail: 'https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=800&h=450&fit=crop',
-    duration: '1:45:33',
-    status: 'processing',
-    progress: 47,
-    game: 'Fortnite',
-  },
-  {
-    id: '3',
-    title: 'CS2 Competitive - Global Elite Games',
-    thumbnail: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=800&h=450&fit=crop',
-    duration: '3:12:05',
-    status: 'ready',
-    clipsFound: 18,
-    game: 'CS2',
-  },
-  {
-    id: '4',
-    title: 'Apex Legends Season 20 Ranked',
-    thumbnail: 'https://images.unsplash.com/photo-1552820728-8b83bb6b2b0d?w=800&h=450&fit=crop',
-    duration: '2:08:44',
-    status: 'rendering',
-    clipsFound: 8,
-    game: 'Apex Legends',
-  },
-  {
-    id: '5',
-    title: 'Minecraft Hardcore Survival Day 100',
-    thumbnail: 'https://images.unsplash.com/photo-1587573089734-09cb69c0f2b4?w=800&h=450&fit=crop',
-    duration: '4:22:18',
-    status: 'ready',
-    clipsFound: 24,
-    game: 'Minecraft',
-  },
-  {
-    id: '6',
-    title: 'Warzone Rebirth Island Quads',
-    thumbnail: 'https://images.unsplash.com/photo-1493711662062-fa541f7f3d24?w=800&h=450&fit=crop',
-    duration: '1:55:30',
-    status: 'processing',
-    progress: 82,
-    game: 'Warzone',
-  },
-]
+// Turn a Cloudinary video URL into a first-frame JPG thumbnail.
+// Inserts so_0 (start offset 0s) and swaps the video extension for .jpg.
+function cloudinaryThumbnail(url: string | null | undefined): string {
+  if (!url) return ''
+  return url
+    .replace('/video/upload/', '/video/upload/so_0/')
+    .replace(/\.(mp4|mov|webm|mkv|avi)(\?|$)/i, '.jpg$2')
+}
+
+function normalizeStatus(status: string | null | undefined): VideoCardProps['status'] {
+  if (status === 'processing' || status === 'rendering') return status
+  return 'ready'
+}
+
+function DashboardSkeleton() {
+  return (
+    <>
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <Skeleton className="h-10 w-full sm:max-w-xs" />
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-10 w-[140px]" />
+          <Skeleton className="h-10 w-20" />
+        </div>
+      </div>
+      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="overflow-hidden rounded-xl border border-border bg-card">
+            <Skeleton className="aspect-video w-full" />
+            <div className="space-y-3 p-4">
+              <Skeleton className="h-5 w-3/4" />
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-5 w-20" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
 
 export default function DashboardPage() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
   const [view, setView] = useState<'grid' | 'list'>('grid')
+  const [videos, setVideos] = useState<VideoCardProps[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const filteredVideos = mockVideos.filter((video) => {
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadVideos() {
+      setLoading(true)
+      setError(null)
+
+      const { data: userData } = await supabase.auth.getUser()
+      const user = userData?.user
+      if (!user) {
+        if (!cancelled) {
+          setVideos([])
+          setLoading(false)
+        }
+        return
+      }
+
+      const { data: videosData, error: vErr } = await supabase
+        .from('videos')
+        .select('id, title, file_name, file_url, game, status')
+        .eq('user_id', user.id)
+
+      if (vErr) {
+        if (!cancelled) {
+          setError(vErr.message)
+          setLoading(false)
+        }
+        return
+      }
+
+      const videoIds = (videosData ?? []).map((v: any) => v.id)
+      const { data: clipsData, error: cErr } = videoIds.length
+        ? await supabase.from('clips').select('video_id').in('video_id', videoIds)
+        : { data: [], error: null }
+
+      if (cErr) {
+        if (!cancelled) {
+          setError(cErr.message)
+          setLoading(false)
+        }
+        return
+      }
+
+      const counts = new Map<string, number>()
+      for (const c of clipsData ?? []) {
+        const vid = String((c as { video_id: string | number }).video_id)
+        counts.set(vid, (counts.get(vid) ?? 0) + 1)
+      }
+
+      const mapped: VideoCardProps[] = (videosData ?? []).map((v: any) => {
+        const id = String(v.id)
+        // Prefer the stored title (set by upload/analyze from the real filename);
+        // fall back to cleaning file_name for rows created before the title column.
+        const displayTitle = (v.title && String(v.title).trim()) || cleanFilename(v.file_name)
+        return {
+          id,
+          title: displayTitle,
+          thumbnail: cloudinaryThumbnail(v.file_url),
+          duration: '',
+          status: normalizeStatus(v.status),
+          clipsFound: counts.get(id) ?? 0,
+          game: v.game || 'Unknown',
+        }
+      })
+
+      if (!cancelled) {
+        setVideos(mapped)
+        setLoading(false)
+      }
+    }
+
+    loadVideos()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const handleDelete = async (videoId: string) => {
+    // Optimistic UI: drop the card immediately, restore on failure.
+    const previous = videos
+    setVideos((prev) => prev.filter((v) => v.id !== videoId))
+
+    const { data: userData } = await supabase.auth.getUser()
+    const user = userData?.user
+    if (!user) {
+      setVideos(previous)
+      toast.error('You must be signed in to delete videos')
+      return
+    }
+
+    // Remove dependent clip rows first so we do not orphan them.
+    const { error: clipsErr } = await supabase
+      .from('clips')
+      .delete()
+      .eq('video_id', videoId)
+
+    if (clipsErr) {
+      setVideos(previous)
+      toast.error(`Failed to delete clips: ${clipsErr.message}`)
+      return
+    }
+
+    const { error: vErr } = await supabase
+      .from('videos')
+      .delete()
+      .eq('id', videoId)
+      .eq('user_id', user.id)
+
+    if (vErr) {
+      setVideos(previous)
+      toast.error(`Failed to delete video: ${vErr.message}`)
+      return
+    }
+
+    toast.success('Video deleted')
+  }
+
+  const filteredVideos = videos.filter((video) => {
     const matchesSearch = video.title.toLowerCase().includes(search.toLowerCase())
+    // "Processing" bucket covers both pre-analyze and active render states so
+    // nothing falls through the cracks of the filter UI.
     const matchesFilter =
       filter === 'all' ||
-      (filter === 'processing' && video.status === 'processing') ||
+      (filter === 'processing' &&
+        (video.status === 'processing' || video.status === 'rendering')) ||
       (filter === 'ready' && video.status === 'ready')
     return matchesSearch && matchesFilter
   })
 
-  const isEmpty = mockVideos.length === 0
+  const isEmpty = !loading && videos.length === 0
 
   return (
     <div className="mx-auto max-w-7xl">
@@ -107,7 +219,13 @@ export default function DashboardPage() {
         </Button>
       </motion.div>
 
-      {isEmpty ? (
+      {loading ? (
+        <DashboardSkeleton />
+      ) : error ? (
+        <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-6 text-center">
+          <p className="text-destructive">Failed to load videos: {error}</p>
+        </div>
+      ) : isEmpty ? (
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -191,7 +309,7 @@ export default function DashboardPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
               >
-                <VideoCard {...video} />
+                <VideoCard {...video} onDelete={handleDelete} />
               </motion.div>
             ))}
           </motion.div>

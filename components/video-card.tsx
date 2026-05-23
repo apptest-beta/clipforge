@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -23,6 +24,7 @@ export interface VideoCardProps {
   progress?: number
   clipsFound?: number
   game: string
+  onDelete?: (id: string) => void
 }
 
 export function VideoCard({
@@ -34,7 +36,11 @@ export function VideoCard({
   progress = 0,
   clipsFound,
   game,
+  onDelete,
 }: VideoCardProps) {
+  const router = useRouter()
+  const goToClips = () => router.push(`/clips/${id}`)
+
   const statusConfig = {
     processing: {
       label: `Processing ${progress}%`,
@@ -58,6 +64,16 @@ export function VideoCard({
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -4 }}
       transition={{ duration: 0.2 }}
+      onClick={goToClips}
+      role="link"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          goToClips()
+        }
+      }}
+      className="cursor-pointer"
     >
       <Card className="group overflow-hidden transition-all glow-hover">
         <div className="relative aspect-video overflow-hidden bg-secondary">
@@ -68,14 +84,13 @@ export function VideoCard({
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
           
           {status === 'ready' && (
-            <Link
-              href={`/editor/${id}`}
+            <div
               className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100"
             >
               <div className="gradient-bg flex h-14 w-14 items-center justify-center rounded-full shadow-lg">
                 <Play className="h-6 w-6 text-white" fill="white" />
               </div>
-            </Link>
+            </div>
           )}
 
           {status === 'processing' && (
@@ -113,18 +128,30 @@ export function VideoCard({
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                 <DropdownMenuItem asChild>
-                  <Link href={`/editor/${id}`}>
+                  <Link href={`/clips/${id}`}>
                     <Edit className="mr-2 h-4 w-4" />
                     Edit Clips
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem className="text-destructive">
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    onDelete?.(id)
+                  }}
+                >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete
                 </DropdownMenuItem>

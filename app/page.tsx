@@ -6,7 +6,7 @@ import { Navbar } from '@/components/navbar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Check, Zap, Wand2, Download, Upload, Play, Sparkles } from 'lucide-react'
+import { Zap, Wand2, Download, Upload, Play, Sparkles } from 'lucide-react'
 
 const features = [
   {
@@ -23,51 +23,6 @@ const features = [
     icon: Download,
     title: 'One-Click Export',
     description: 'Export directly to TikTok, YouTube Shorts, and Instagram Reels formats.',
-  },
-]
-
-const pricingPlans = [
-  {
-    name: 'Free',
-    price: '$0',
-    period: '/month',
-    description: 'Perfect for trying out ClipForge',
-    features: ['30 minutes of video/month', 'Basic moment detection', 'Standard export quality', 'Watermark on clips'],
-    cta: 'Get Started',
-    popular: false,
-  },
-  {
-    name: 'Creator',
-    price: '$19',
-    period: '/month',
-    description: 'For growing content creators',
-    features: [
-      '10 hours of video/month',
-      'Advanced AI detection',
-      'HD export quality',
-      'No watermark',
-      'Priority processing',
-      'Custom captions',
-    ],
-    cta: 'Start Free Trial',
-    popular: true,
-  },
-  {
-    name: 'Pro',
-    price: '$49',
-    period: '/month',
-    description: 'For professional streamers',
-    features: [
-      'Unlimited video',
-      'All AI features',
-      '4K export quality',
-      'No watermark',
-      'Instant processing',
-      'Custom branding',
-      'API access',
-    ],
-    cta: 'Start Free Trial',
-    popular: false,
   },
 ]
 
@@ -130,14 +85,14 @@ export default function LandingPage() {
             variants={itemVariants}
             className="mx-auto mt-6 max-w-2xl text-pretty text-lg text-muted-foreground sm:text-xl"
           >
-            AI finds your kills, clutches, and rage moments automatically. Stop scrolling through hours of footage — let
+            AI finds your kills, clutches, and rage moments automatically. Stop scrolling through hours of footage - let
             ClipForge do the work.
           </motion.p>
 
           <motion.div variants={itemVariants} className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Button size="lg" className="gradient-bg glow text-lg text-white" asChild>
               <Link href="/upload">
-                Try it free — no credit card
+                Try it free - no credit card
               </Link>
             </Button>
             <Button size="lg" variant="outline" className="text-lg" asChild>
@@ -211,67 +166,6 @@ export default function LandingPage() {
                   </CardHeader>
                   <CardContent>
                     <CardDescription className="text-base">{feature.description}</CardDescription>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-      </section>
-
-      {/* Pricing Section */}
-      <section id="pricing" className="px-6 py-24">
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          variants={containerVariants}
-          className="mx-auto max-w-6xl"
-        >
-          <motion.div variants={itemVariants} className="mb-16 text-center">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-              Simple, transparent <span className="gradient-text">pricing</span>
-            </h2>
-            <p className="mt-4 text-lg text-muted-foreground">Start free, upgrade when you need more</p>
-          </motion.div>
-
-          <div className="grid gap-8 lg:grid-cols-3">
-            {pricingPlans.map((plan) => (
-              <motion.div key={plan.name} variants={itemVariants}>
-                <Card
-                  className={`relative h-full transition-all hover:-translate-y-1 ${
-                    plan.popular ? 'gradient-border glow' : ''
-                  }`}
-                >
-                  {plan.popular && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                      <Badge className="gradient-bg text-white">Most Popular</Badge>
-                    </div>
-                  )}
-                  <CardHeader className="pt-8">
-                    <CardTitle className="text-2xl">{plan.name}</CardTitle>
-                    <CardDescription>{plan.description}</CardDescription>
-                    <div className="mt-4">
-                      <span className="text-4xl font-bold">{plan.price}</span>
-                      <span className="text-muted-foreground">{plan.period}</span>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="flex flex-col">
-                    <ul className="mb-8 space-y-3">
-                      {plan.features.map((feature) => (
-                        <li key={feature} className="flex items-center gap-3">
-                          <Check className="h-5 w-5 shrink-0 text-primary" />
-                          <span className="text-sm">{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <Button
-                      className={`mt-auto w-full ${plan.popular ? 'gradient-bg text-white' : ''}`}
-                      variant={plan.popular ? 'default' : 'outline'}
-                      asChild
-                    >
-                      <Link href="/upload">{plan.cta}</Link>
-                    </Button>
                   </CardContent>
                 </Card>
               </motion.div>

@@ -1,149 +1,159 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { useRouter } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
-import { Slider } from '@/components/ui/slider'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
-  Play,
-  Pause,
   Download,
   Crosshair,
   Trophy,
   Laugh,
   Angry,
-  Volume2,
-  Maximize,
-  SkipBack,
-  SkipForward,
-  Lock,
+  Sparkles,
+  Film,
+  Play,
 } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import { cleanFilename } from '@/lib/utils'
 
-const mockClips = [
-  {
-    id: '1',
-    thumbnail: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=225&fit=crop',
-    type: 'kill',
-    startTime: '2:34',
-    endTime: '2:42',
-    confidence: 94,
-    selected: true,
-  },
-  {
-    id: '2',
-    thumbnail: 'https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=400&h=225&fit=crop',
-    type: 'clutch',
-    startTime: '5:12',
-    endTime: '5:28',
-    confidence: 89,
-    selected: true,
-  },
-  {
-    id: '3',
-    thumbnail: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=400&h=225&fit=crop',
-    type: 'kill',
-    startTime: '8:45',
-    endTime: '8:52',
-    confidence: 91,
-    selected: false,
-  },
-  {
-    id: '4',
-    thumbnail: 'https://images.unsplash.com/photo-1552820728-8b83bb6b2b0d?w=400&h=225&fit=crop',
-    type: 'funny',
-    startTime: '12:03',
-    endTime: '12:15',
-    confidence: 78,
-    selected: true,
-  },
-  {
-    id: '5',
-    thumbnail: 'https://images.unsplash.com/photo-1587573089734-09cb69c0f2b4?w=400&h=225&fit=crop',
-    type: 'rage',
-    startTime: '18:22',
-    endTime: '18:35',
-    confidence: 85,
-    selected: false,
-  },
-  {
-    id: '6',
-    thumbnail: 'https://images.unsplash.com/photo-1493711662062-fa541f7f3d24?w=400&h=225&fit=crop',
-    type: 'kill',
-    startTime: '24:18',
-    endTime: '24:26',
-    confidence: 96,
-    selected: true,
-  },
-  {
-    id: '7',
-    thumbnail: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=225&fit=crop',
-    type: 'clutch',
-    startTime: '31:05',
-    endTime: '31:22',
-    confidence: 92,
-    selected: true,
-  },
-  {
-    id: '8',
-    thumbnail: 'https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=400&h=225&fit=crop',
-    type: 'kill',
-    startTime: '45:33',
-    endTime: '45:40',
-    confidence: 88,
-    selected: false,
-  },
-]
-
-const momentMarkers = [
-  { position: 2, type: 'kill' },
-  { position: 8, type: 'kill' },
-  { position: 15, type: 'clutch' },
-  { position: 25, type: 'funny' },
-  { position: 38, type: 'rage' },
-  { position: 52, type: 'kill' },
-  { position: 68, type: 'clutch' },
-  { position: 85, type: 'kill' },
-]
-
-const typeConfig = {
-  kill: { label: 'Kill', color: 'bg-red-500', textColor: 'text-red-500', icon: Crosshair },
-  clutch: { label: 'Clutch', color: 'bg-yellow-500', textColor: 'text-yellow-500', icon: Trophy },
-  funny: { label: 'Funny', color: 'bg-blue-500', textColor: 'text-blue-500', icon: Laugh },
-  rage: { label: 'Rage', color: 'bg-orange-500', textColor: 'text-orange-500', icon: Angry },
+interface EditorClip {
+  id: string
+  thumbnail: string
+  moment_type: string
+  start_time: number | null
+  end_time: number | null
+  score: number | null
+  clip_url: string | null
+  selected: boolean
 }
 
-const exportFormats = [
-  { value: 'tiktok', label: 'TikTok (9:16)' },
-  { value: 'youtube', label: 'YouTube Shorts (9:16)' },
-  { value: 'instagram', label: 'Instagram Reels (9:16)' },
-  { value: 'landscape', label: 'Landscape (16:9)' },
-]
+interface EditorVideo {
+  id: string
+  file_name: string | null
+  game: string | null
+}
+
+const typeConfig: Record<string, { label: string; color: string; icon: any }> = {
+  kill: { label: 'Kill', color: 'bg-red-500', icon: Crosshair },
+  clutch: { label: 'Clutch', color: 'bg-yellow-500', icon: Trophy },
+  funny: { label: 'Funny', color: 'bg-blue-500', icon: Laugh },
+  rage: { label: 'Rage', color: 'bg-orange-500', icon: Angry },
+}
+
+function configFor(type: string) {
+  const key = (type || '').toLowerCase()
+  return typeConfig[key] || { label: type || 'Moment', color: 'bg-primary', icon: Sparkles }
+}
+
+function formatSeconds(s: number | null | undefined): string {
+  if (s == null || Number.isNaN(s)) return '--:--'
+  const total = Math.max(0, Math.round(s))
+  const m = Math.floor(total / 60)
+  const sec = total % 60
+  return `${m}:${sec.toString().padStart(2, '0')}`
+}
+
+function EditorSkeleton() {
+  return (
+    <div className="space-y-6">
+      <Skeleton className="h-10 w-2/3" />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="overflow-hidden rounded-xl border border-border bg-card">
+            <Skeleton className="aspect-video w-full" />
+            <div className="space-y-2 p-3">
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export default function EditorPage() {
+  const params = useParams<{ id: string }>()
   const router = useRouter()
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [currentTime, setCurrentTime] = useState(25)
-  const [clips, setClips] = useState(mockClips)
-  const [format, setFormat] = useState('tiktok')
-  const [addCaptions, setAddCaptions] = useState(true)
-  const [addMusic, setAddMusic] = useState(false)
-  const [removeWatermark, setRemoveWatermark] = useState(false)
+  const videoId = params?.id ? String(params.id) : ''
+
+  const [video, setVideo] = useState<EditorVideo | null>(null)
+  const [clips, setClips] = useState<EditorClip[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [exportingIds, setExportingIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function load() {
+      if (!videoId) {
+        setError('Missing video id')
+        setLoading(false)
+        return
+      }
+
+      setLoading(true)
+      setError(null)
+
+      const { data: vData, error: vErr } = await supabase
+        .from('videos')
+        .select('id, file_name, game')
+        .eq('id', videoId)
+        .single()
+
+      if (cancelled) return
+
+      if (vErr) {
+        setError(vErr.message)
+        setLoading(false)
+        return
+      }
+
+      const { data: cData, error: cErr } = await supabase
+        .from('clips')
+        .select('id, moment_type, start_time, end_time, score, thumbnail_url, clip_url')
+        .eq('video_id', videoId)
+        .order('start_time', { ascending: true })
+
+      if (cancelled) return
+
+      if (cErr) {
+        setError(cErr.message)
+        setLoading(false)
+        return
+      }
+
+      const mapped: EditorClip[] = (cData ?? []).map((row: any) => ({
+        id: String(row.id),
+        thumbnail: row.thumbnail_url || '',
+        moment_type: row.moment_type || 'moment',
+        start_time: row.start_time ?? null,
+        end_time: row.end_time ?? null,
+        score: row.score ?? null,
+        clip_url: row.clip_url || null,
+        selected: Boolean(row.clip_url),
+      }))
+
+      setVideo(vData as EditorVideo)
+      setClips(mapped)
+      setLoading(false)
+    }
+
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [videoId])
 
   const selectedCount = clips.filter((c) => c.selected).length
+  const readyCount = clips.filter((c) => c.clip_url).length
 
   const toggleClipSelection = (id: string) => {
     setClips((prev) =>
@@ -151,12 +161,65 @@ export default function EditorPage() {
     )
   }
 
-  const handleExport = () => {
-    toast.success(`Exporting ${selectedCount} clips...`)
+  const handleExportOne = (clipId: string) => {
+    const clip = clips.find((c) => c.id === clipId)
+    if (!clip) return
+    if (!clip.clip_url) {
+      toast.error('This clip has not been cut yet. Open it in Clips and run Cut Clip first.')
+      return
+    }
+    setExportingIds((prev) => new Set(prev).add(clipId))
+    toast.success(`Downloading ${configFor(clip.moment_type).label}...`)
+    const a = document.createElement('a')
+    a.href = `/api/export?clip_id=${encodeURIComponent(clipId)}`
+    a.rel = 'noopener'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
     setTimeout(() => {
-      router.push('/exports')
+      setExportingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(clipId)
+        return next
+      })
     }, 1500)
   }
+
+  const handleExportSelected = () => {
+    const selected = clips.filter((c) => c.selected && c.clip_url)
+    if (selected.length === 0) {
+      toast.error('Select at least one clip that has been cut.')
+      return
+    }
+    selected.forEach((clip, i) => {
+      // Stagger downloads slightly so the browser opens each one.
+      setTimeout(() => handleExportOne(clip.id), i * 400)
+    })
+  }
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-7xl">
+        <EditorSkeleton />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="mx-auto max-w-7xl">
+        <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-6 text-center">
+          <p className="text-destructive">Failed to load video: {error}</p>
+          <Button variant="outline" className="mt-4" onClick={() => router.push('/dashboard')}>
+            Back to dashboard
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  const title = video?.file_name ? cleanFilename(video.file_name) : 'Untitled video'
+  const game = video?.game || 'Unknown'
 
   return (
     <div className="mx-auto max-w-7xl">
@@ -165,129 +228,27 @@ export default function EditorPage() {
         animate={{ opacity: 1, y: 0 }}
         className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
       >
-        <div>
-          <h1 className="text-2xl font-bold lg:text-3xl">Valorant Ranked Grind - Diamond Push</h1>
+        <div className="min-w-0">
+          <h1 className="truncate text-2xl font-bold lg:text-3xl">{title}</h1>
           <p className="mt-1 text-muted-foreground">
-            {clips.length} moments detected • Duration: 2:34:12
+            {game} • {clips.length} moments • {readyCount} cut
           </p>
         </div>
+        <Button variant="outline" onClick={() => router.push(`/clips/${videoId}`)}>
+          Open clip workspace
+        </Button>
       </motion.div>
 
       <div className="grid gap-6 xl:grid-cols-[1fr,320px]">
-        <div className="space-y-6">
-          {/* Video Player */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <Card className="overflow-hidden">
-              <div className="relative aspect-video bg-black">
-                <div
-                  className="absolute inset-0 bg-cover bg-center"
-                  style={{
-                    backgroundImage:
-                      'url(https://images.unsplash.com/photo-1542751371-adc38448a05e?w=1200&h=675&fit=crop)',
-                  }}
-                />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-16 w-16 rounded-full bg-black/50 text-white backdrop-blur-sm hover:bg-black/70"
-                    onClick={() => setIsPlaying(!isPlaying)}
-                  >
-                    {isPlaying ? (
-                      <Pause className="h-8 w-8" fill="white" />
-                    ) : (
-                      <Play className="h-8 w-8" fill="white" />
-                    )}
-                  </Button>
-                </div>
-
-                {/* Video Controls */}
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
-                  {/* Timeline with markers */}
-                  <div className="relative mb-3 h-2">
-                    <div className="absolute inset-0 rounded-full bg-white/20" />
-                    <div
-                      className="gradient-bg absolute left-0 top-0 h-full rounded-full"
-                      style={{ width: `${currentTime}%` }}
-                    />
-                    {momentMarkers.map((marker, i) => {
-                      const config = typeConfig[marker.type as keyof typeof typeConfig]
-                      return (
-                        <div
-                          key={i}
-                          className={`absolute top-1/2 h-3 w-3 -translate-y-1/2 cursor-pointer rounded-full ${config.color} ring-2 ring-white/50 transition-transform hover:scale-125`}
-                          style={{ left: `${marker.position}%` }}
-                          title={`${config.label} at ${marker.position}%`}
-                        />
-                      )
-                    })}
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={currentTime}
-                      onChange={(e) => setCurrentTime(Number(e.target.value))}
-                      className="absolute inset-0 cursor-pointer opacity-0"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between text-white">
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-white hover:bg-white/20">
-                        <SkipBack className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-white hover:bg-white/20"
-                        onClick={() => setIsPlaying(!isPlaying)}
-                      >
-                        {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-white hover:bg-white/20">
-                        <SkipForward className="h-4 w-4" />
-                      </Button>
-                      <span className="ml-2 text-sm">0:38:45 / 2:34:12</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-white hover:bg-white/20">
-                        <Volume2 className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-white hover:bg-white/20">
-                        <Maximize className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Timeline legend */}
-              <CardContent className="border-t border-border p-3">
-                <div className="flex flex-wrap items-center gap-4">
-                  <span className="text-sm text-muted-foreground">Moment types:</span>
-                  {Object.entries(typeConfig).map(([key, config]) => (
-                    <div key={key} className="flex items-center gap-1.5">
-                      <div className={`h-2.5 w-2.5 rounded-full ${config.color}`} />
-                      <span className="text-sm">{config.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Clips Grid */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Detected Clips ({clips.length})</h2>
+        {/* Clips Grid */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Detected Clips ({clips.length})</h2>
+            {clips.length > 0 && (
               <Button
                 variant="outline"
                 size="sm"
@@ -298,11 +259,18 @@ export default function EditorPage() {
               >
                 {clips.every((c) => c.selected) ? 'Deselect All' : 'Select All'}
               </Button>
-            </div>
+            )}
+          </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {clips.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 py-16">
+              <Film className="mb-4 h-10 w-10 text-muted-foreground" />
+              <p className="text-muted-foreground">No clips detected for this video yet.</p>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
               {clips.map((clip, index) => {
-                const config = typeConfig[clip.type as keyof typeof typeConfig]
+                const config = configFor(clip.moment_type)
                 const Icon = config.icon
                 return (
                   <motion.div
@@ -317,12 +285,18 @@ export default function EditorPage() {
                       }`}
                       onClick={() => toggleClipSelection(clip.id)}
                     >
-                      <div className="relative aspect-video overflow-hidden">
-                        <div
-                          className="absolute inset-0 bg-cover bg-center transition-transform duration-300 group-hover:scale-105"
-                          style={{ backgroundImage: `url(${clip.thumbnail})` }}
-                        />
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 transition-opacity group-hover:opacity-100">
+                      <div className="relative aspect-video overflow-hidden bg-secondary">
+                        {clip.thumbnail ? (
+                          <div
+                            className="absolute inset-0 bg-cover bg-center transition-transform duration-300 group-hover:scale-105"
+                            style={{ backgroundImage: `url(${clip.thumbnail})` }}
+                          />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <Film className="h-8 w-8 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition-opacity group-hover:opacity-100">
                           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90">
                             <Play className="h-5 w-5 text-black" fill="black" />
                           </div>
@@ -335,19 +309,44 @@ export default function EditorPage() {
                             onCheckedChange={() => toggleClipSelection(clip.id)}
                           />
                         </div>
-                        <Badge
-                          className={`absolute right-2 top-2 ${config.color} border-0 text-white`}
-                        >
+                        <Badge className={`absolute right-2 top-2 ${config.color} border-0 text-white`}>
                           <Icon className="mr-1 h-3 w-3" />
                           {config.label}
                         </Badge>
                       </div>
                       <CardContent className="p-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">
-                            {clip.startTime} - {clip.endTime}
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="font-medium">
+                            {formatSeconds(clip.start_time)} – {formatSeconds(clip.end_time)}
                           </span>
-                          <span className="text-xs text-muted-foreground">{clip.confidence}%</span>
+                          {clip.score != null && (
+                            <span className="text-xs text-muted-foreground">
+                              {Math.round(clip.score)}%
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-3 flex items-center justify-between">
+                          {clip.clip_url ? (
+                            <Badge variant="outline" className="border-green-500/30 bg-green-500/10 text-green-500">
+                              Ready
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="border-yellow-500/30 bg-yellow-500/10 text-yellow-500">
+                              Not cut
+                            </Badge>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={!clip.clip_url || exportingIds.has(clip.id)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleExportOne(clip.id)
+                            }}
+                          >
+                            <Download className="mr-2 h-4 w-4" />
+                            Export
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
@@ -355,91 +354,40 @@ export default function EditorPage() {
                 )
               })}
             </div>
-          </motion.div>
-        </div>
+          )}
+        </motion.div>
 
         {/* Export Sidebar */}
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.3 }}
+          transition={{ delay: 0.2 }}
           className="space-y-4"
         >
           <Card className="sticky top-24">
             <CardHeader>
-              <CardTitle>Export Settings</CardTitle>
+              <CardTitle>Batch Export</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label>Format</Label>
-                <Select value={format} onValueChange={setFormat}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {exportFormats.map((f) => (
-                      <SelectItem key={f.value} value={f.value}>
-                        {f.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Selected</span>
+                <span className="font-medium">{selectedCount}</span>
               </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="captions" className="cursor-pointer">
-                    Add captions
-                  </Label>
-                  <Switch
-                    id="captions"
-                    checked={addCaptions}
-                    onCheckedChange={setAddCaptions}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="music" className="cursor-pointer">
-                    Add music
-                  </Label>
-                  <Switch id="music" checked={addMusic} onCheckedChange={setAddMusic} />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="watermark" className="cursor-pointer">
-                      Remove watermark
-                    </Label>
-                    <Lock className="h-3.5 w-3.5 text-muted-foreground" />
-                  </div>
-                  <Switch
-                    id="watermark"
-                    checked={removeWatermark}
-                    onCheckedChange={setRemoveWatermark}
-                    disabled
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  <Button variant="link" className="h-auto p-0 text-xs" asChild>
-                    <a href="#pricing">Upgrade to remove watermark</a>
-                  </Button>
-                </p>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Cut and ready</span>
+                <span className="font-medium">{readyCount}</span>
               </div>
-
-              <div className="border-t border-border pt-4">
-                <div className="mb-4 flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Selected clips</span>
-                  <span className="font-medium">{selectedCount}</span>
-                </div>
-                <Button
-                  onClick={handleExport}
-                  disabled={selectedCount === 0}
-                  className="gradient-bg glow w-full text-white"
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Export Selected ({selectedCount})
-                </Button>
-              </div>
+              <Button
+                onClick={handleExportSelected}
+                disabled={selectedCount === 0}
+                className="gradient-bg glow w-full text-white"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Export Selected ({selectedCount})
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Clips marked &quot;Not cut&quot; need to be cut in the workspace first.
+              </p>
             </CardContent>
           </Card>
         </motion.div>
