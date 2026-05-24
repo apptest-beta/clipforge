@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
@@ -16,7 +16,11 @@ import { Mail, Lock, Loader2 } from 'lucide-react'
 import { Logo } from '@/components/logo'
 import { createClient } from '@/lib/supabase/client'
 
-export default function LoginPage() {
+// Inner component holds the useSearchParams call. Next.js requires anything
+// that reads search params to live under a Suspense boundary, otherwise the
+// build-time prerender fails with "useSearchParams should be wrapped in a
+// suspense boundary at page ...".
+function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -183,6 +187,14 @@ export default function LoginPage() {
         </Card>
       </motion.div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   )
 }
 
