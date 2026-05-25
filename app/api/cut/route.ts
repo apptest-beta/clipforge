@@ -4,8 +4,6 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { v2 as cloudinary } from 'cloudinary'
-import ffmpeg from 'fluent-ffmpeg'
-const ffmpegPath = process.env.FFMPEG_PATH || require('ffmpeg-static')
 import fs from 'fs/promises'
 import os from 'os'
 import path from 'path'
@@ -15,11 +13,31 @@ import { secureJson, secureError } from '@/lib/security/headers'
 import { isUuid, isOwnCloudinaryUrl, hasOnlyKeys } from '@/lib/security/validators'
 import { requireEnv } from '@/lib/security/env'
 
-const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || 'dffygtstq'
+// Route segment config - must be at module top so Next picks it up.
+// runtime=nodejs because fluent-ffmpeg + ffmpeg-static need the Node runtime
+// (binary spawn, fs access). maxDuration=300 gives FFmpeg + Cloudinary uploads
+// up to 5 minutes per cut request on Vercel Pro.
+export const runtime = 'nodejs'
+export const maxDuration = 300
 
-if (ffmpegPath) {
-  ffmpeg.setFfmpegPath(ffmpegPath as string)
+// Lazy-load fluent-ffmpeg + ffmpeg-static under try/catch. Both are native-binary
+// deps that can fail to resolve on Vercel serverless if the binary wasn't traced
+// into the bundle. Wrapping the load lets the build succeed and gives us a clean
+// 503 at runtime instead of a hard crash on cold start.
+let ffmpeg: any = null
+let ffmpegLoadError: Error | null = null
+try {
+  ffmpeg = require('fluent-ffmpeg')
+  const ffmpegPath: string | null = process.env.FFMPEG_PATH || require('ffmpeg-static')
+  if (ffmpegPath) {
+    ffmpeg.setFfmpegPath(ffmpegPath as string)
+  }
+} catch (err) {
+  ffmpegLoadError = err as Error
+  console.error('[cut] Failed to load ffmpeg deps:', err)
 }
+
+const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || 'dffygtstq'
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -31,9 +49,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
-
-export const runtime = 'nodejs'
-export const maxDuration = 300
 
 async function downloadToTemp(url: string, dest: string): Promise<void> {
   let res: Response
@@ -76,14 +91,14 @@ function cutClip(input: string, output: string, start: number, end: number): Pro
         '-avoid_negative_ts', 'make_zero',
       ])
       .output(output)
-      .on('start', (cmd) => {
+      .on('start', (cmd: string) => {
         lastCommand = cmd
       })
-      .on('stderr', (line) => {
+      .on('stderr', (line: string) => {
         stderrBuffer = (stderrBuffer + line + '\n').slice(-2048)
       })
       .on('end', () => resolve())
-      .on('error', (err) => {
+      .on('error', (err: Error) => {
         console.error(`[cut] FFmpeg failed (${start}s-${end}s). Cmd: ${lastCommand}`)
         console.error(`[cut] FFmpeg stderr tail: ${stderrBuffer}`)
         reject(new Error(`FFmpeg cut failed: ${err.message}`))
@@ -98,7 +113,7 @@ function extractThumbnail(input: string, output: string, atSeconds: number): Pro
       .outputOptions(['-ss', String(Math.max(0, atSeconds)), '-frames:v', '1', '-q:v', '3'])
       .output(output)
       .on('end', () => resolve())
-      .on('error', (err) => reject(err))
+      .on('error', (err: Error) => reject(err))
       .run()
   })
 }
@@ -147,6 +162,16 @@ export async function POST(request: NextRequest) {
     })
   }
 
+  // Fail fast if ffmpeg couldn't load at cold-start. Surfaces a clear 503
+  // instead of letting downstream code blow up with a confusing TypeError.
+  if (ffmpegLoadError || !ffmpeg) {
+    return secureError(
+      'Video processing is unavailable on this deployment',
+      503,
+      ffmpegLoadError || 'ffmpeg not loaded'
+    )
+  }
+
   try {
     requireEnv([
       'CLOUDINARY_CLOUD_NAME',
@@ -178,7 +203,6 @@ export async function POST(request: NextRequest) {
     if (!isUuid(video_id)) {
       return secureError('video_id must be a valid UUID', 400)
     }
-    // clip_id is optional but if provided must be a UUID
     if (clip_id !== undefined && clip_id !== null && !isUuid(clip_id)) {
       return secureError('clip_id must be a valid UUID', 400)
     }
@@ -196,7 +220,6 @@ export async function POST(request: NextRequest) {
     if (!video.file_url) {
       return secureError('Video has no source URL', 400)
     }
-    // SSRF guard: only fetch from our own Cloudinary account.
     if (!isOwnCloudinaryUrl(video.file_url, CLOUD_NAME)) {
       return secureError('Video source URL is not allowed', 400, `Rejected url: ${video.file_url}`)
     }
