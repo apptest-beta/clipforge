@@ -5,7 +5,7 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { v2 as cloudinary } from 'cloudinary'
 import ffmpeg from 'fluent-ffmpeg'
-import ffmpegStatic from 'ffmpeg-static'
+const ffmpegPath = process.env.FFMPEG_PATH || require('ffmpeg-static')
 import fs from 'fs/promises'
 import os from 'os'
 import path from 'path'
@@ -17,8 +17,8 @@ import { requireEnv } from '@/lib/security/env'
 
 const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || 'dffygtstq'
 
-if (ffmpegStatic) {
-  ffmpeg.setFfmpegPath(ffmpegStatic as unknown as string)
+if (ffmpegPath) {
+  ffmpeg.setFfmpegPath(ffmpegPath as string)
 }
 
 cloudinary.config({
