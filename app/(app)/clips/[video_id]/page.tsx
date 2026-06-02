@@ -135,12 +135,11 @@ export default function ClipsPage() {
     }
   }, [video_id, fetchClips, fetchVideo])
 
-  async function handleCut(_clipId: string) {
-    toast.info('Video cutting is not available yet')
-  }
-
-  async function _handleCut_unused(clipId: string) {
+  async function handleCut(clipId: string) {
     if (!video_id || cuttingIds.has(clipId)) return
+
+    const clip = clips.find((c) => c.id === clipId)
+    if (!clip) return
 
     setCuttingIds((prev) => {
       const next = new Set(prev)
@@ -153,23 +152,19 @@ export default function ClipsPage() {
       const res = await fetch('/api/cut', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ video_id, clip_id: clipId }),
+        body: JSON.stringify({
+          videoId: clip.video_id,
+          startTime: clip.start_time,
+          endTime: clip.end_time,
+        }),
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) {
         throw new Error(json?.error || `Cut failed (${res.status})`)
       }
 
-      const refreshed = await fetchClips()
-      if (!refreshed.ok) {
-        setError(refreshed.message || 'Refresh failed')
-        return
-      }
-
-      const result = (json?.clips || [])[0]
-      if (!result?.url) {
-        toast.error('Cut failed', { description: result?.error || 'No URL returned' })
-      }
+      await fetchClips()
+      toast.success('Clip ready', { description: 'Your clip has been cut successfully' })
     } catch (e: any) {
       const msg = e?.message || 'Cut failed'
       setError(msg)
@@ -360,22 +355,37 @@ export default function ClipsPage() {
                           Not cut yet
                         </Badge>
                       )}
+                      <Badge variant="outline" className="border-border bg-secondary/50 text-muted-foreground">
+                        {Math.round(clip.end_time - clip.start_time)}s
+                      </Badge>
                     </div>
 
                     <div className="flex gap-2">
-                      <Button
-                        variant="secondary"
-                        className="flex-1"
-                        onClick={() => handleCut(clip.id)}
-                        disabled={isCutting}
-                      >
-                        {isCutting ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <Scissors className="mr-2 h-4 w-4" />
-                        )}
-                        {isCutting ? 'Cutting...' : 'Cut Clip'}
-                      </Button>
+                      {clip.clip_url ? (
+                        <Button
+                          className="gradient-bg flex-1 text-white"
+                          asChild
+                        >
+                          <a href={clip.clip_url} target="_blank" rel="noopener noreferrer" download>
+                            <Download className="mr-2 h-4 w-4" />
+                            Download
+                          </a>
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="secondary"
+                          className="flex-1"
+                          onClick={() => handleCut(clip.id)}
+                          disabled={isCutting}
+                        >
+                          {isCutting ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Scissors className="mr-2 h-4 w-4" />
+                          )}
+                          {isCutting ? 'Cutting...' : 'Cut Clip'}
+                        </Button>
+                      )}
                       <Button
                         className="gradient-bg flex-1 text-white"
                         onClick={() => handleExport(clip.id, canExport)}

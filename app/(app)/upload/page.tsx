@@ -150,33 +150,47 @@ export default function UploadPage() {
       if (!fileUrl) throw new Error('Upload succeeded but no URL returned')
 
       setUploadProgress(50)
-      setStatusLabel('Analyzing...')
+      setStatusLabel('Analyzing with AI...')
+
+      // Fake progress tick: nudge from 50% toward 95% every 2s while analysis runs
+      let fakePct = 50
+      const ticker = setInterval(() => {
+        fakePct = Math.min(95, fakePct + 3)
+        setUploadProgress(fakePct)
+      }, 2000)
 
       // Step 2: Send to analyze API with the Uploadthing URL
-      const response = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileName: file.name,
-          fileUrl,
-          game,
-          momentTypes: selectedMoments,
-        }),
-      })
+      let response: Response | undefined
+      try {
+        response = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileName: file.name,
+            fileUrl,
+            game,
+            momentTypes: selectedMoments,
+          }),
+        })
+      } finally {
+        clearInterval(ticker)
+      }
 
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Analysis failed')
+      if (!response || !response.ok) {
+        const errJson = response ? await response.json().catch(() => ({})) : {}
+        throw new Error((errJson as { error?: string }).error || 'Analysis failed')
       }
 
       await response.json()
       setUploadProgress(100)
+      setStatusLabel('Done! Redirecting...')
       toast.success('Analysis complete!')
       setTimeout(() => router.push('/dashboard'), 1000)
     } catch (error) {
       console.error('Upload error:', error)
       toast.error(error instanceof Error ? error.message : 'Upload failed. Please try again.')
       setIsUploading(false)
+      setUploadProgress(0)
     }
   }
 

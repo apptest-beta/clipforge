@@ -157,24 +157,25 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Upload the video to Cloudinary so we have a stable public_id for thumbnails and clips.
-    let cloudinaryPublicId: string
-    let cloudinarySecureUrl: string
-    try {
-      const uploadResult = await cloudinary.uploader.upload(fileUrl as string, {
-        resource_type: 'video',
-        folder: 'clipforge',
-      })
-      cloudinaryPublicId = uploadResult.public_id
-      cloudinarySecureUrl = uploadResult.secure_url
-    } catch (err) {
-      console.error('[analyze] cloudinary upload error:', err)
-      return secureError('Cloudinary upload failed', 500, err)
-    }
+    // Use Cloudinary's fetch transformation to reference the Uploadthing video directly —
+    // no upload needed. The raw fileUrl doubles as the public_id for thumbnail generation.
+    const cloudinaryPublicId: string = fileUrl as string
+    const cloudinarySecureUrl: string = cloudinary.url(fileUrl as string, {
+      type: 'fetch',
+      resource_type: 'video',
+      secure: true,
+    })
 
     const prompt = `You are an expert gaming clip detector. Analyze this gameplay video from ${game}. Find exactly 5 of the most exciting, funny, or impressive moments. Look for: kills, clutch plays, funny accidents, rage moments, epic fails, unexpected events. For each moment give a start_time and end_time that captures the full context (minimum 8 seconds, maximum 30 seconds). Return only valid JSON: { "moments": [{ "start_time": 10, "end_time": 28, "moment_type": "kill", "confidence": 87, "description": "Clean headshot from across the map" }] }`
 
-    const text = await generateWithRetry(prompt)
+    let text: string
+    try {
+      text = await generateWithRetry(prompt)
+    } catch (err) {
+      console.error('[analyze] gemini error:', err)
+      return secureError('AI analysis failed', 500, err)
+    }
+
     const clean = text.replace(/```json|```/g, '').trim()
     let parsed: any
     try {
@@ -204,6 +205,10 @@ export async function POST(request: NextRequest) {
 
     if (videoError) {
       return secureError('Failed to save video', 500, videoError)
+    }
+
+    if (!parsed?.moments || !Array.isArray(parsed.moments) || parsed.moments.length === 0) {
+      return secureJson({ moments: [], message: 'No highlights found', videoId: video?.id })
     }
 
     if (video && parsed?.moments && Array.isArray(parsed.moments)) {
