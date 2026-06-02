@@ -1,24 +1,101 @@
-// Cut route stub. The full FFmpeg-based implementation requires native binaries
-// (ffmpeg-static + fluent-ffmpeg) that do not run reliably on Vercel serverless.
-// This stub keeps the API path responding with a clean 503 so the client can
-// surface a useful message instead of crashing on a missing endpoint.
-//
-// To re-enable: bring back fluent-ffmpeg + ffmpeg-static and deploy to an env
-// with FFmpeg available (self-hosted Node, fly.io, Render, etc.).
-import { NextResponse } from 'next/server'
+// Forwards cut requests to the Railway microservice (clipforge-cutter).
+// Required env vars: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
+import { type NextRequest } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { rateLimit } from '@/lib/security/rate-limit'
+import { secureJson, secureError } from '@/lib/security/headers'
+
+const CUTTER_URL = 'https://clipforge-cutter-production.up.railway.app'
 
 export const runtime = 'nodejs'
 
-export async function POST() {
-  return NextResponse.json(
-    { error: 'Video cutting requires a self-hosted deployment' },
-    {
-      status: 503,
-      headers: {
-        'X-Content-Type-Options': 'nosniff',
-        'X-Frame-Options': 'DENY',
-        'Referrer-Policy': 'strict-origin-when-cross-origin',
-      },
+export async function POST(request: NextRequest) {
+  console.log('[cut] route hit')
+  try {
+    // Rate limit: 20 cut requests per minute per IP
+    const limit = await rateLimit(request, 'cut', 20, 60)
+    if (!limit.success) {
+      return secureError('Too many requests, please slow down', 429, undefined, {
+        'Retry-After': String(limit.retryAfter),
+      })
     }
-  )
+
+    let body: unknown
+    try {
+      body = await request.json()
+    } catch {
+      return secureError('Invalid JSON body', 400)
+    }
+
+    if (!body || typeof body !== 'object') {
+      return secureError('Invalid request body', 400)
+    }
+
+    const { videoId, startTime, endTime } = body as {
+      videoId?: unknown
+      startTime?: unknown
+      endTime?: unknown
+    }
+
+    if (typeof videoId !== 'string' || videoId.length === 0) {
+      return secureError('videoId is required', 400)
+    }
+    if (typeof startTime !== 'number' || typeof endTime !== 'number') {
+      return secureError('startTime and endTime must be numbers', 400)
+    }
+
+    // Look up the source video URL from Supabase
+    const supabase = await createClient()
+
+    const { data: video, error: videoError } = await supabase
+      .from('videos')
+      .select('id, file_url')
+      .eq('id', videoId)
+      .maybeSingle()
+
+    if (videoError) {
+      console.error('[cut] supabase error:', videoError)
+      return secureError('Failed to fetch video', 500, videoError)
+    }
+    if (!video?.file_url) {
+      return secureError('Video not found', 400)
+    }
+
+    console.log('[cut] forwarding to cutter service:', video.file_url)
+
+    // Forward to Railway microservice
+    const cutRes = await fetch(`${CUTTER_URL}/cut`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileUrl: video.file_url, startTime, endTime }),
+    })
+
+    const cutJson = await cutRes.json().catch(() => ({}))
+
+    if (!cutRes.ok) {
+      console.error('[cut] cutter service error:', cutJson)
+      return secureError(cutJson?.error || 'Cut service failed', 500)
+    }
+
+    const clipUrl: string = cutJson.clip_url
+    if (!clipUrl) {
+      return secureError('Cut service returned no clip_url', 500)
+    }
+
+    // Update the clips row with the new clip_url
+    const { error: updateError } = await supabase
+      .from('clips')
+      .update({ clip_url: clipUrl })
+      .eq('video_id', videoId)
+
+    if (updateError) {
+      console.error('[cut] failed to update clip_url:', updateError)
+      return secureError('Failed to save clip URL', 500, updateError)
+    }
+
+    return secureJson({ clip_url: clipUrl })
+  } catch (err) {
+    console.error('[cut] unhandled error:', err)
+    return secureError('Internal server error', 500, err)
+  }
 }

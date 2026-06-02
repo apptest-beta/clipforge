@@ -1,20 +1,36 @@
 // Required env vars:
 //   GEMINI_API_KEY, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
-//   CLOUDINARY_CLOUD_NAME (for thumbnail URL derivation only - public cloud_name)
+//   CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
 import { NextRequest } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { v2 as cloudinary } from 'cloudinary'
 import { createClient } from '@/lib/supabase/server'
 import { rateLimit } from '@/lib/security/rate-limit'
 import { secureJson, secureError } from '@/lib/security/headers'
 import {
-  isCloudinaryUrl,
   isPositiveNumber,
   hasOnlyKeys,
 } from '@/lib/security/validators'
 import { requireEnv } from '@/lib/security/env'
 
-const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || 'dffygtstq'
 const MAX_DURATION_SEC = 7200 // 2 hours
+
+// Validate an Uploadthing file URL (ufs.sh or utfs.io CDN domains)
+function isUploadthingUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  try {
+    const u = new URL(value)
+    return (
+      u.protocol === 'https:' &&
+      (u.hostname.endsWith('.ufs.sh') ||
+        u.hostname.endsWith('.utfs.io') ||
+        u.hostname === 'utfs.io' ||
+        u.hostname === 'ufs.sh')
+    )
+  } catch {
+    return false
+  }
+}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -50,15 +66,14 @@ function titleFromFileName(name: string | null | undefined): string {
   return base.trim() || 'Recording'
 }
 
-function publicIdFromUrl(url: string | null | undefined): string | null {
-  if (!url) return null
-  const match = url.match(/\/video\/upload\/(?:[^/]+\/)*?(?:v\d+\/)?([^?]+)\.[a-z0-9]+(?:\?.*)?$/i)
-  return match ? match[1] : null
-}
-
+// Generate a thumbnail URL using the Cloudinary public_id of the uploaded video.
 function thumbnailFor(publicId: string, startTime: number): string {
   const so = Math.max(0, Math.floor(startTime))
-  return `https://res.cloudinary.com/${CLOUD_NAME}/video/upload/so_${so},w_640,h_360,c_fill,f_jpg/${publicId}.jpg`
+  return cloudinary.url(publicId, {
+    resource_type: 'video',
+    transformation: [{ start_offset: so, width: 640, height: 360, crop: 'fill' }],
+    format: 'jpg',
+  })
 }
 
 // Allowed top-level keys on the incoming JSON body. Anything else is rejected.
@@ -75,10 +90,24 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    requireEnv(['GEMINI_API_KEY', 'NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY'])
+    requireEnv([
+      'GEMINI_API_KEY',
+      'NEXT_PUBLIC_SUPABASE_URL',
+      'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+      'CLOUDINARY_CLOUD_NAME',
+      'CLOUDINARY_API_KEY',
+      'CLOUDINARY_API_SECRET',
+    ])
   } catch (err) {
+    console.error('[analyze] missing env vars:', err)
     return secureError('Server misconfigured', 500, err)
   }
+
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  })
 
   let body: unknown
   try {
@@ -102,8 +131,8 @@ export async function POST(request: NextRequest) {
     durationSec?: unknown
   }
 
-  // Validate the Cloudinary delivery URL. Must be HTTPS on res.cloudinary.com.
-  if (!isCloudinaryUrl(fileUrl)) {
+  // Validate the Uploadthing delivery URL. Must be HTTPS on a ufs.sh / utfs.io CDN domain.
+  if (!isUploadthingUrl(fileUrl)) {
     return secureError('Invalid or missing fileUrl', 400)
   }
 
@@ -128,6 +157,21 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // Upload the video to Cloudinary so we have a stable public_id for thumbnails and clips.
+    let cloudinaryPublicId: string
+    let cloudinarySecureUrl: string
+    try {
+      const uploadResult = await cloudinary.uploader.upload(fileUrl as string, {
+        resource_type: 'video',
+        folder: 'clipforge',
+      })
+      cloudinaryPublicId = uploadResult.public_id
+      cloudinarySecureUrl = uploadResult.secure_url
+    } catch (err) {
+      console.error('[analyze] cloudinary upload error:', err)
+      return secureError('Cloudinary upload failed', 500, err)
+    }
+
     const prompt = `You are an expert gaming clip detector. Analyze this gameplay video from ${game}. Find exactly 5 of the most exciting, funny, or impressive moments. Look for: kills, clutch plays, funny accidents, rage moments, epic fails, unexpected events. For each moment give a start_time and end_time that captures the full context (minimum 8 seconds, maximum 30 seconds). Return only valid JSON: { "moments": [{ "start_time": 10, "end_time": 28, "moment_type": "kill", "confidence": 87, "description": "Clean headshot from across the map" }] }`
 
     const text = await generateWithRetry(prompt)
@@ -136,6 +180,7 @@ export async function POST(request: NextRequest) {
     try {
       parsed = JSON.parse(clean)
     } catch (parseErr) {
+      console.error('[analyze] JSON parse error:', parseErr)
       return secureError('Analysis returned invalid data', 502, parseErr)
     }
 
@@ -148,10 +193,11 @@ export async function POST(request: NextRequest) {
       .insert({
         file_name: (fileName as string) || 'upload',
         title: titleFromFileName(fileName as string | null | undefined),
-        file_url: fileUrl,
+        file_url: cloudinarySecureUrl,
         game,
         status: 'ready',
         user_id: userId,
+        cloudinary_public_id: cloudinaryPublicId,
       })
       .select()
       .single()
@@ -160,8 +206,6 @@ export async function POST(request: NextRequest) {
       return secureError('Failed to save video', 500, videoError)
     }
 
-    const publicId = publicIdFromUrl(fileUrl as string)
-
     if (video && parsed?.moments && Array.isArray(parsed.moments)) {
       const rows = parsed.moments.map((m: any) => ({
         video_id: video.id,
@@ -169,11 +213,11 @@ export async function POST(request: NextRequest) {
         end_time: m.end_time,
         moment_type: m.moment_type,
         confidence: m.confidence,
-        thumbnail_url: publicId ? thumbnailFor(publicId, Number(m.start_time) || 0) : null,
+        thumbnail_url: thumbnailFor(cloudinaryPublicId, Number(m.start_time) || 0),
       }))
       const { error: insertErr } = await supabase.from('clips').insert(rows)
       if (insertErr) {
-        // Don't fail the request — the video row already saved.
+        // Don't fail the request - the video row already saved.
         console.error('[analyze] clips insert failed:', insertErr)
       }
     }
@@ -197,6 +241,7 @@ export async function POST(request: NextRequest) {
 
     return secureJson({ ...parsed, videoId: video?.id })
   } catch (error) {
+    console.error('[analyze] unhandled error:', error)
     return secureError('Analysis failed', 500, error)
   }
 }

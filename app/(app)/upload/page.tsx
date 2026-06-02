@@ -1,5 +1,7 @@
 'use client'
 import { useState, useCallback } from 'react'
+import { genUploader } from 'uploadthing/client'
+import type { OurFileRouter } from '@/app/api/uploadthing/core'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -55,6 +57,8 @@ const momentTypes = [
   { id: 'jumpscares', label: 'Jump Scares', icon: Ghost, color: 'text-purple-500' },
 ]
 
+const { uploadFiles } = genUploader<OurFileRouter>()
+
 export default function UploadPage() {
   const router = useRouter()
   const [isDragging, setIsDragging] = useState(false)
@@ -64,6 +68,7 @@ export default function UploadPage() {
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [statusLabel, setStatusLabel] = useState('Uploading...')
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -129,37 +134,34 @@ export default function UploadPage() {
 
     setIsUploading(true)
     setUploadProgress(0)
+    setStatusLabel('Uploading...')
 
     try {
-      // Step 1: Upload to Cloudinary through our API route
-      const formData = new FormData()
-      formData.append('file', file)
-
-      const cloudinaryResponse = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
+      // Step 1: Upload to Uploadthing
+      const uploaded = await uploadFiles('videoUploader', {
+        files: [file],
+        onUploadProgress: ({ progress }) => {
+          // Scale upload progress to 0–50% so the remaining 50% is for analysis
+          setUploadProgress(Math.round(progress * 0.5))
+        },
       })
 
-      if (!cloudinaryResponse.ok) {
-        throw new Error('Cloudinary upload failed')
-      }
+      const fileUrl = uploaded[0]?.serverData?.url ?? uploaded[0]?.ufsUrl
+      if (!fileUrl) throw new Error('Upload succeeded but no URL returned')
 
-      const cloudinaryData = await cloudinaryResponse.json()
       setUploadProgress(50)
+      setStatusLabel('Analyzing...')
 
-      // Step 2: Send to analyze API with real URL
+      // Step 2: Send to analyze API with the Uploadthing URL
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fileName: file.name,
-          fileUrl: cloudinaryData.secure_url,
-          // Cloudinary returns duration (in seconds) on the upload response;
-          // analyze uses it to bump the user usage_minutes counter.
-          durationSec: cloudinaryData.duration ?? null,
+          fileUrl,
           game,
-          momentTypes: selectedMoments
-        })
+          momentTypes: selectedMoments,
+        }),
       })
 
       if (!response.ok) {
@@ -167,7 +169,7 @@ export default function UploadPage() {
         throw new Error(error.error || 'Analysis failed')
       }
 
-      const result = await response.json()
+      await response.json()
       setUploadProgress(100)
       toast.success('Analysis complete!')
       setTimeout(() => router.push('/dashboard'), 1000)
@@ -242,7 +244,7 @@ export default function UploadPage() {
                     <Badge variant="outline">.webm</Badge>
                     <Badge variant="outline">.mkv</Badge>
                     <Badge variant="outline">.avi</Badge>
-                    <Badge variant="outline">up to 10GB</Badge>
+                    <Badge variant="outline">up to 2GB</Badge>
                   </div>
                 </motion.div>
               ) : (
@@ -270,11 +272,13 @@ export default function UploadPage() {
                   {isUploading && (
                     <div className="mt-4">
                       <div className="mb-2 flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Uploading...</span>
+                        <span className="text-muted-foreground">{statusLabel}</span>
                         <span className="font-medium">{Math.round(uploadProgress)}%</span>
                       </div>
                       <Progress value={uploadProgress} className="h-2" />
-                      <p className="mt-2 text-xs text-muted-foreground">Processing...</p>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        {uploadProgress < 50 ? 'Uploading to storage...' : 'Running AI analysis...'}
+                      </p>
                     </div>
                   )}
                 </motion.div>

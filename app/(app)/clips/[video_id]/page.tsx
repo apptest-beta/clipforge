@@ -135,7 +135,11 @@ export default function ClipsPage() {
     }
   }, [video_id, fetchClips, fetchVideo])
 
-  async function handleCut(clipId: string) {
+  async function handleCut(_clipId: string) {
+    toast.info('Video cutting is not available yet')
+  }
+
+  async function _handleCut_unused(clipId: string) {
     if (!video_id || cuttingIds.has(clipId)) return
 
     setCuttingIds((prev) => {
@@ -144,10 +148,6 @@ export default function ClipsPage() {
       return next
     })
     setError(null)
-
-    const toastId = toast.loading('Cutting clip...', {
-      description: 'FFmpeg is re-encoding for a frame-accurate cut',
-    })
 
     try {
       const res = await fetch('/api/cut', {
@@ -163,29 +163,17 @@ export default function ClipsPage() {
       const refreshed = await fetchClips()
       if (!refreshed.ok) {
         setError(refreshed.message || 'Refresh failed')
-        toast.error('Cut finished but refresh failed', {
-          id: toastId,
-          description: refreshed.message,
-        })
         return
       }
 
       const result = (json?.clips || [])[0]
-      if (result?.url) {
-        toast.success('Clip ready', {
-          id: toastId,
-          description: 'Export is now active',
-        })
-      } else {
-        toast.error('Cut failed', {
-          id: toastId,
-          description: result?.error || 'No URL returned',
-        })
+      if (!result?.url) {
+        toast.error('Cut failed', { description: result?.error || 'No URL returned' })
       }
     } catch (e: any) {
       const msg = e?.message || 'Cut failed'
       setError(msg)
-      toast.error('Cut failed', { id: toastId, description: msg })
+      toast.error('Cut failed', { description: msg })
     } finally {
       setCuttingIds((prev) => {
         const next = new Set(prev)
