@@ -24,7 +24,17 @@ export interface VideoCardProps {
   progress?: number
   clipsFound?: number
   game: string
+  createdAt?: string
   onDelete?: (id: string) => void
+}
+
+function formatDate(iso: string | undefined): string {
+  if (!iso) return ''
+  try {
+    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  } catch {
+    return ''
+  }
 }
 
 export function VideoCard({
@@ -36,6 +46,7 @@ export function VideoCard({
   progress = 0,
   clipsFound,
   game,
+  createdAt,
   onDelete,
 }: VideoCardProps) {
   const router = useRouter()
@@ -75,7 +86,7 @@ export function VideoCard({
       }}
       className="cursor-pointer"
     >
-      <Card className="group overflow-hidden transition-all glow-hover">
+      <Card className="group overflow-hidden transition-all hover:border-[#2A2A2A]">
         <div className="relative aspect-video overflow-hidden bg-secondary">
           <div
             className="absolute inset-0 bg-cover bg-center transition-transform duration-300 group-hover:scale-105"
@@ -87,7 +98,7 @@ export function VideoCard({
             <div
               className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100"
             >
-              <div className="gradient-bg flex h-14 w-14 items-center justify-center rounded-full shadow-lg">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full border border-[#E8FF47] bg-[#1A1A1A] shadow-lg">
                 <Play className="h-6 w-6 text-white" fill="white" />
               </div>
             </div>
@@ -123,6 +134,9 @@ export function VideoCard({
                     <Film className="h-3.5 w-3.5" />
                     {clipsFound} clips found
                   </span>
+                )}
+                {createdAt && (
+                  <span className="text-xs text-muted-foreground">{formatDate(createdAt)}</span>
                 )}
               </div>
             </div>

@@ -7,13 +7,12 @@ import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
-import { Upload, Film, Download, Settings, Plus } from 'lucide-react'
+import { Upload, LayoutDashboard, Settings, Plus } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 const navItems = [
-  { href: '/dashboard', label: 'My Clips', icon: Film },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/upload', label: 'Upload', icon: Upload },
-  { href: '/exports', label: 'Exports', icon: Download },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
@@ -98,7 +97,7 @@ export function AppSidebar() {
       className="fixed left-0 top-16 z-40 hidden h-[calc(100vh-4rem)] w-64 border-r border-border bg-sidebar lg:block"
     >
       <div className="flex h-full flex-col p-4">
-        <Button className="gradient-bg glow-hover mb-6 w-full text-white" asChild>
+        <Button className="mb-6 w-full cursor-pointer border border-[#E8FF47] bg-[#1A1A1A] text-[#E8FF47] hover:bg-[#E8FF47] hover:text-[#0D0D0D]" asChild>
           <Link href="/upload">
             <Plus className="mr-2 h-4 w-4" />
             Upload Video

@@ -61,23 +61,50 @@ export async function POST(request: NextRequest) {
       return secureError('Video not found', 400)
     }
 
+    console.log('[cut] videoId:', videoId, 'start:', startTime, 'end:', endTime)
     console.log('[cut] forwarding to cutter service:', video.file_url)
 
-    // Forward to Railway microservice
-    const cutRes = await fetch(`${CUTTER_URL}/cut`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fileUrl: video.file_url, startTime, endTime }),
-    })
+    // Forward to Railway microservice with 60s AbortController timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 60000)
 
-    const cutJson = await cutRes.json().catch(() => ({}))
+    let cutRes: Response
+    try {
+      cutRes = await fetch(`${CUTTER_URL}/cut`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileUrl: video.file_url, startTime, endTime }),
+        signal: controller.signal,
+      })
+    } catch (fetchErr: unknown) {
+      clearTimeout(timeoutId)
+      if (fetchErr instanceof Error && fetchErr.name === 'AbortError') {
+        return secureError(
+          'Cut timed out — video may be too long or Railway is under load',
+          504
+        )
+      }
+      throw fetchErr
+    }
+    clearTimeout(timeoutId)
+
+    let cutJson: Record<string, unknown> = {}
+    try {
+      cutJson = await cutRes.json()
+    } catch {
+      cutJson = {}
+    }
 
     if (!cutRes.ok) {
       console.error('[cut] cutter service error:', cutJson)
-      return secureError(cutJson?.error || 'Cut service failed', 500)
+      const errMsg =
+        (cutJson?.error as string) ||
+        (cutJson?.message as string) ||
+        `Cut service failed (${cutRes.status})`
+      return secureError(errMsg, 500)
     }
 
-    const clipUrl: string = cutJson.clip_url
+    const clipUrl: string = cutJson.clip_url as string
     if (!clipUrl) {
       return secureError('Cut service returned no clip_url', 500)
     }

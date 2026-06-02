@@ -56,8 +56,7 @@ export default function LandingPage() {
       <section className="relative overflow-hidden px-6 py-24 lg:py-32">
         {/* Background gradient effects */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 left-1/4 h-96 w-96 rounded-full bg-[#8B5CF6]/20 blur-3xl" />
-          <div className="absolute -top-20 right-1/4 h-80 w-80 rounded-full bg-[#EC4899]/20 blur-3xl" />
+
         </div>
 
         <motion.div
@@ -90,9 +89,9 @@ export default function LandingPage() {
           </motion.p>
 
           <motion.div variants={itemVariants} className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Button size="lg" className="gradient-bg glow text-lg text-white" asChild>
+            <Button size="lg" className="border border-[#E8FF47] bg-[#1A1A1A] text-[#E8FF47] text-lg hover:bg-[#E8FF47] hover:text-[#0D0D0D] cursor-pointer" asChild>
               <Link href="/upload">
-                Try it free - no credit card
+                Get Started Free
               </Link>
             </Button>
             <Button size="lg" variant="outline" className="text-lg" asChild>
@@ -114,7 +113,7 @@ export default function LandingPage() {
           transition={{ duration: 0.6 }}
           className="mx-auto max-w-4xl"
         >
-          <div className="gradient-border glow rounded-2xl bg-card p-8 lg:p-12">
+          <div className="rounded-2xl border border-[#2A2A2A] bg-card p-8 lg:p-12">
             <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-secondary/30 p-12 transition-colors hover:border-primary/50 hover:bg-secondary/50">
               <motion.div
                 animate={{ y: [0, -8, 0] }}
@@ -157,10 +156,10 @@ export default function LandingPage() {
           <div className="grid gap-8 md:grid-cols-3">
             {features.map((feature, index) => (
               <motion.div key={feature.title} variants={itemVariants}>
-                <Card className="gradient-border glow-hover h-full transition-all hover:-translate-y-1">
+                <Card className="h-full border-[#2A2A2A] bg-[#141414] transition-all hover:-translate-y-1">
                   <CardHeader>
-                    <div className="gradient-bg mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl">
-                      <feature.icon className="h-6 w-6 text-white" />
+                    <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-[#2A2A2A] bg-[#1A1A1A]">
+                      <feature.icon className="h-6 w-6 text-[#E8FF47]" />
                     </div>
                     <CardTitle className="text-xl">{feature.title}</CardTitle>
                   </CardHeader>
@@ -183,18 +182,18 @@ export default function LandingPage() {
           transition={{ duration: 0.6 }}
           className="mx-auto max-w-4xl"
         >
-          <div className="gradient-bg glow relative overflow-hidden rounded-3xl p-12 text-center lg:p-16">
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
-            <h2 className="relative text-3xl font-bold text-white sm:text-4xl">
+          <div className="relative overflow-hidden rounded-3xl border border-[#2A2A2A] bg-[#141414] p-12 text-center lg:p-16">
+
+            <h2 className="relative text-3xl font-bold sm:text-4xl">
               Ready to create viral clips?
             </h2>
-            <p className="relative mt-4 text-lg text-white/80">
+            <p className="relative mt-4 text-lg text-muted-foreground">
               Join thousands of creators who save hours every week with ClipForge.
             </p>
             <Button
               size="lg"
               variant="secondary"
-              className="relative mt-8 bg-white text-lg font-semibold text-[#8B5CF6] hover:bg-white/90"
+              className="relative mt-8 cursor-pointer border border-[#E8FF47] bg-[#1A1A1A] text-lg font-semibold text-[#E8FF47] hover:bg-[#E8FF47] hover:text-[#0D0D0D]"
               asChild
             >
               <Link href="/upload">Start for free</Link>
@@ -207,11 +206,11 @@ export default function LandingPage() {
       <footer className="border-t border-border px-6 py-12">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 md:flex-row">
           <div className="flex items-center gap-2">
-            <div className="gradient-bg flex h-8 w-8 items-center justify-center rounded-lg">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#E8FF47] bg-[#1A1A1A]">
               <svg
                 viewBox="0 0 24 24"
                 fill="none"
-                className="h-5 w-5 text-white"
+                className="h-5 w-5 text-[#E8FF47]"
                 stroke="currentColor"
                 strokeWidth="2"
                 strokeLinecap="round"

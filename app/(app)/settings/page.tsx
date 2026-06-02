@@ -2,21 +2,33 @@
 
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Camera, Mail, User, Loader2 } from 'lucide-react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import { Mail, User, Loader2, LogOut, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { ensureProfile, usernameFromEmail, type Profile } from '@/lib/supabase/profiles'
 
 export default function SettingsPage() {
   const supabase = createClient()
+  const router = useRouter()
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -24,10 +36,6 @@ export default function SettingsPage() {
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
   const [originalUsername, setOriginalUsername] = useState('')
-
-  const [emailNotifications, setEmailNotifications] = useState(true)
-  const [processingUpdates, setProcessingUpdates] = useState(true)
-  const [marketingEmails, setMarketingEmails] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -41,8 +49,6 @@ export default function SettingsPage() {
         return
       }
 
-      // ensureProfile is a no-op if the row already exists, so this
-      // doubles as a self-heal for accounts created before the profiles table.
       const row = await ensureProfile(supabase, {
         id: user.id,
         email: user.email ?? null,
@@ -102,8 +108,12 @@ export default function SettingsPage() {
     toast.success('Settings saved')
   }
 
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
   const initial = (username || email || '?').charAt(0).toUpperCase()
-  const planLabel = profile?.plan ? `${profile.plan.charAt(0).toUpperCase()}${profile.plan.slice(1)} Plan` : 'Guest'
 
   if (loading) {
     return (
@@ -138,22 +148,15 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex items-center gap-6">
-              <div className="relative">
-                <Avatar className="h-20 w-20">
-                  <AvatarImage src="/avatar.png" alt="Profile" />
-                  <AvatarFallback className="gradient-bg text-2xl text-white">{initial}</AvatarFallback>
-                </Avatar>
-                <Button
-                  size="icon"
-                  variant="secondary"
-                  className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full"
-                >
-                  <Camera className="h-4 w-4" />
-                </Button>
-              </div>
+              <Avatar className="h-16 w-16">
+                <AvatarImage src="/avatar.png" alt="Profile" />
+                <AvatarFallback className="bg-[#1A1A1A] border border-[#E8FF47] text-[#E8FF47] text-xl font-bold">
+                  {initial}
+                </AvatarFallback>
+              </Avatar>
               <div>
                 <p className="font-medium">{username || 'You'}</p>
-                <p className="text-sm text-muted-foreground">{planLabel}</p>
+                <p className="text-sm text-muted-foreground">{email}</p>
               </div>
             </div>
 
@@ -192,7 +195,7 @@ export default function SettingsPage() {
             <Button
               onClick={handleSave}
               disabled={saving || !profile}
-              className="gradient-bg text-white"
+              className="cursor-pointer border border-[#E8FF47] bg-[#1A1A1A] text-[#E8FF47] hover:bg-[#E8FF47] hover:text-[#0D0D0D]"
             >
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Save Changes
@@ -202,39 +205,52 @@ export default function SettingsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Notifications</CardTitle>
-            <CardDescription>Configure how you receive updates</CardDescription>
+            <CardTitle>Account</CardTitle>
+            <CardDescription>Manage your session</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">Email notifications</p>
-                <p className="text-sm text-muted-foreground">
-                  Receive email when your clips are ready
-                </p>
-              </div>
-              <Switch checked={emailNotifications} onCheckedChange={setEmailNotifications} />
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">Processing updates</p>
-                <p className="text-sm text-muted-foreground">
-                  Get notified about processing status
-                </p>
-              </div>
-              <Switch checked={processingUpdates} onCheckedChange={setProcessingUpdates} />
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">Marketing emails</p>
-                <p className="text-sm text-muted-foreground">
-                  Receive tips and product updates
-                </p>
-              </div>
-              <Switch checked={marketingEmails} onCheckedChange={setMarketingEmails} />
-            </div>
+          <CardContent>
+            <Button
+              variant="outline"
+              onClick={handleSignOut}
+              className="cursor-pointer border-[#444444] text-[#EDEDED] hover:bg-[#1A1A1A]"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Sign out
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="border-destructive/30">
+          <CardHeader>
+            <CardTitle className="text-destructive">Danger Zone</CardTitle>
+            <CardDescription>Irreversible account actions</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="cursor-pointer border-destructive/50 text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Account
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Account</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This feature is coming soon.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="cursor-pointer">Close</AlertDialogCancel>
+                  <AlertDialogAction disabled className="cursor-not-allowed opacity-50">
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </CardContent>
         </Card>
       </motion.div>

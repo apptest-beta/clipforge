@@ -106,7 +106,7 @@ export function Navbar({ variant = 'landing' }: NavbarProps) {
                 <Button variant="ghost" className="flex items-center gap-2 px-2">
                   <Avatar className="h-8 w-8">
                     <AvatarImage alt="User" />
-                    <AvatarFallback className="gradient-bg text-white text-sm">{initial}</AvatarFallback>
+                    <AvatarFallback className="border border-[#E8FF47] bg-[#1A1A1A] text-[#E8FF47] text-sm">{initial}</AvatarFallback>
                   </Avatar>
                   <span className="hidden text-sm font-medium sm:inline">{displayName}</span>
                   <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -177,7 +177,7 @@ export function Navbar({ variant = 'landing' }: NavbarProps) {
           <Button variant="ghost" asChild>
             <Link href="/login">Log in</Link>
           </Button>
-          <Button className="gradient-bg glow-hover text-white" asChild>
+          <Button className="cursor-pointer border border-[#E8FF47] bg-[#1A1A1A] text-[#E8FF47] hover:bg-[#E8FF47] hover:text-[#0D0D0D]" asChild>
             <Link href="/signup">Get Started</Link>
           </Button>
         </div>

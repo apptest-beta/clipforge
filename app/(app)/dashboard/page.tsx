@@ -88,7 +88,7 @@ export default function DashboardPage() {
 
       const { data: videosData, error: vErr } = await supabase
         .from('videos')
-        .select('id, title, file_name, file_url, game, status')
+        .select('id, title, file_name, file_url, game, status, created_at')
         .eq('user_id', user.id)
 
       if (vErr) {
@@ -131,6 +131,7 @@ export default function DashboardPage() {
           status: normalizeStatus(v.status),
           clipsFound: counts.get(id) ?? 0,
           game: v.game || 'Unknown',
+          createdAt: v.created_at || undefined,
         }
       })
 
@@ -208,10 +209,10 @@ export default function DashboardPage() {
         className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
       >
         <div>
-          <h1 className="text-3xl font-bold">My Clips</h1>
-          <p className="mt-1 text-muted-foreground">Manage your video recordings and clips</p>
+          <h1 className="text-3xl font-bold">My Videos</h1>
+          <p className="mt-1 text-muted-foreground">Manage your gaming footage and clips</p>
         </div>
-        <Button className="gradient-bg glow-hover shrink-0 text-white" asChild>
+        <Button className="shrink-0 border border-[#E8FF47] bg-[#1A1A1A] text-[#E8FF47] hover:bg-[#E8FF47] hover:text-[#0D0D0D] cursor-pointer" asChild>
           <Link href="/upload">
             <Upload className="mr-2 h-4 w-4" />
             Upload Video
@@ -234,9 +235,9 @@ export default function DashboardPage() {
           <div className="gradient-bg mb-6 rounded-2xl p-4">
             <Film className="h-10 w-10 text-white" />
           </div>
-          <h2 className="mb-2 text-xl font-semibold">No recordings yet</h2>
-          <p className="mb-6 text-muted-foreground">Upload your first recording to get started</p>
-          <Button className="gradient-bg text-white" asChild>
+          <h2 className="mb-2 text-xl font-semibold">No videos yet</h2>
+          <p className="mb-6 text-muted-foreground">Upload your first gaming clip to get started</p>
+          <Button className="border border-[#E8FF47] bg-[#1A1A1A] text-[#E8FF47] hover:bg-[#E8FF47] hover:text-[#0D0D0D] cursor-pointer" asChild>
             <Link href="/upload">
               <Upload className="mr-2 h-4 w-4" />
               Upload Video

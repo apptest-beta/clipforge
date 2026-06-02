@@ -131,6 +131,11 @@ export async function POST(request: NextRequest) {
     durationSec?: unknown
   }
 
+  // Early check: fileUrl and game are required
+  if (!fileUrl || !game) {
+    return secureError('fileUrl and game are required', 400)
+  }
+
   // Validate the Uploadthing delivery URL. Must be HTTPS on a ufs.sh / utfs.io CDN domain.
   if (!isUploadthingUrl(fileUrl)) {
     return secureError('Invalid or missing fileUrl', 400)

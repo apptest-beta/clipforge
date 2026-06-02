@@ -40,11 +40,13 @@ import {
 
 const games = [
   { value: 'valorant', label: 'Valorant' },
-  { value: 'fortnite', label: 'Fortnite' },
-  { value: 'minecraft', label: 'Minecraft' },
   { value: 'cs2', label: 'CS2' },
-  { value: 'warzone', label: 'Warzone' },
+  { value: 'fortnite', label: 'Fortnite' },
   { value: 'apex', label: 'Apex Legends' },
+  { value: 'cod', label: 'Call of Duty' },
+  { value: 'minecraft', label: 'Minecraft' },
+  { value: 'rocket-league', label: 'Rocket League' },
+  { value: 'gta-v', label: 'GTA V' },
   { value: 'other', label: 'Other' },
 ]
 
@@ -185,7 +187,7 @@ export default function UploadPage() {
       setUploadProgress(100)
       setStatusLabel('Done! Redirecting...')
       toast.success('Analysis complete!')
-      setTimeout(() => router.push('/dashboard'), 1000)
+      setTimeout(() => router.push('/dashboard'), 1500)
     } catch (error) {
       console.error('Upload error:', error)
       toast.error(error instanceof Error ? error.message : 'Upload failed. Please try again.')
@@ -232,7 +234,7 @@ export default function UploadPage() {
                   onDrop={handleDrop}
                   className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-12 transition-all ${
                     isDragging
-                      ? 'border-primary bg-primary/5'
+                      ? 'border-[#E8FF47] bg-[#E8FF47]/5'
                       : 'border-border bg-secondary/30 hover:border-primary/50 hover:bg-secondary/50'
                   }`}
                 >
@@ -244,9 +246,9 @@ export default function UploadPage() {
                   />
                   <motion.div
                     animate={{ y: isDragging ? -10 : 0 }}
-                    className="gradient-bg mb-6 rounded-2xl p-4"
+                    className="mb-6 rounded-2xl border border-[#2A2A2A] bg-[#1A1A1A] p-4"
                   >
-                    <Upload className="h-10 w-10 text-white" />
+                    <Upload className="h-10 w-10 text-[#E8FF47]" />
                   </motion.div>
                   <h3 className="mb-2 text-xl font-semibold">
                     {isDragging ? 'Drop your file here' : 'Drop your recording here'}
@@ -270,8 +272,8 @@ export default function UploadPage() {
                   className="rounded-xl border border-border bg-secondary/30 p-4"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="gradient-bg flex h-14 w-14 shrink-0 items-center justify-center rounded-xl">
-                      <FileVideo className="h-7 w-7 text-white" />
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-[#2A2A2A] bg-[#1A1A1A]">
+                      <FileVideo className="h-7 w-7 text-[#E8FF47]" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{file.name}</p>
@@ -361,8 +363,8 @@ export default function UploadPage() {
                         onClick={() => handleMomentToggle(moment.id)}
                         className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-all ${
                           selectedMoments.includes(moment.id)
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border hover:border-primary/50'
+                            ? 'border-[#E8FF47] bg-[#E8FF47]/5'
+                            : 'border-[#222222] hover:border-[#E8FF47]/50'
                         }`}
                       >
                         <Checkbox
@@ -392,7 +394,7 @@ export default function UploadPage() {
           onClick={handleUpload}
           disabled={!file || !game || isUploading}
           size="lg"
-          className="gradient-bg glow w-full text-lg text-white"
+          className="w-full text-lg border border-[#E8FF47] bg-[#1A1A1A] text-[#E8FF47] hover:bg-[#E8FF47] hover:text-[#0D0D0D]"
         >
           {isUploading ? (
             <>
@@ -404,7 +406,7 @@ export default function UploadPage() {
               <Sparkles className="mr-2 h-5 w-5" />
               Start Processing
             </>
-          )}
+                )}
         </Button>
       </motion.div>
     </div>

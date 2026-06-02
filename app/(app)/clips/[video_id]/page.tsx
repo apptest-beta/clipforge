@@ -73,7 +73,6 @@ export default function ClipsPage() {
   const [error, setError] = useState<string | null>(null)
   // Set of clip IDs currently being cut - each card tracks its own state.
   const [cuttingIds, setCuttingIds] = useState<Set<string>>(new Set())
-  const [exporting, setExporting] = useState<string | null>(null)
 
   const fetchClips = useCallback(async (): Promise<{ ok: boolean; message?: string }> => {
     if (!video_id) return { ok: false, message: 'Missing video_id' }
@@ -178,18 +177,6 @@ export default function ClipsPage() {
     }
   }
 
-  function handleExport(clipId: string, hasUrl: boolean) {
-    if (!hasUrl) {
-      const msg = 'This clip has not been cut yet. Click "Cut Clip" first.'
-      setError(msg)
-      toast.warning(msg)
-      return
-    }
-    setExporting(clipId)
-    window.location.href = `/api/export?clip_id=${encodeURIComponent(clipId)}`
-    toast.success('Download started')
-    setTimeout(() => setExporting(null), 1500)
-  }
 
   const cuttableCount = clips.filter((c) => !c.clip_url).length
 
@@ -270,13 +257,11 @@ export default function ClipsPage() {
           animate={{ opacity: 1, scale: 1 }}
           className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 py-24"
         >
-          <div className="gradient-bg mb-6 rounded-2xl p-4">
-            <Film className="h-10 w-10 text-white" />
+          <div className="mb-6 rounded-2xl border border-[#2A2A2A] bg-[#1A1A1A] p-4">
+            <Film className="h-10 w-10 text-[#888888]" />
           </div>
-          <h2 className="mb-2 text-xl font-semibold">No clips for this video yet</h2>
-          <p className="mb-6 text-muted-foreground">
-            Run the analyzer to find moments, then come back here to cut them.
-          </p>
+          <h2 className="mb-2 text-xl font-semibold">No highlights found</h2>
+          <p className="mb-6 text-muted-foreground">Try uploading a different video</p>
           <Button className="gradient-bg text-white" asChild>
             <Link href="/dashboard">Back to dashboard</Link>
           </Button>
@@ -290,9 +275,7 @@ export default function ClipsPage() {
         >
           {clips.map((clip, index) => {
             const duration = Math.max(0, clip.end_time - clip.start_time)
-            const isExporting = exporting === clip.id
             const isCutting = cuttingIds.has(clip.id)
-            const canExport = Boolean(clip.clip_url)
 
             return (
               <motion.div
@@ -363,7 +346,7 @@ export default function ClipsPage() {
                     <div className="flex gap-2">
                       {clip.clip_url ? (
                         <Button
-                          className="gradient-bg flex-1 text-white"
+                          className="flex-1 cursor-pointer border border-green-500 bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white"
                           asChild
                         >
                           <a href={clip.clip_url} target="_blank" rel="noopener noreferrer" download>
@@ -374,7 +357,7 @@ export default function ClipsPage() {
                       ) : (
                         <Button
                           variant="secondary"
-                          className="flex-1"
+                          className="flex-1 cursor-pointer"
                           onClick={() => handleCut(clip.id)}
                           disabled={isCutting}
                         >
@@ -386,18 +369,6 @@ export default function ClipsPage() {
                           {isCutting ? 'Cutting...' : 'Cut Clip'}
                         </Button>
                       )}
-                      <Button
-                        className="gradient-bg flex-1 text-white"
-                        onClick={() => handleExport(clip.id, canExport)}
-                        disabled={!canExport || isExporting}
-                      >
-                        {isExporting ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <Download className="mr-2 h-4 w-4" />
-                        )}
-                        Export
-                      </Button>
                     </div>
                   </CardContent>
                 </Card>
