@@ -1,231 +1,288 @@
-'use client'
-
-import { motion } from 'framer-motion'
 import Link from 'next/link'
-import { Navbar } from '@/components/navbar'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Zap, Wand2, Download, Upload, Play, Sparkles } from 'lucide-react'
-
-const features = [
-  {
-    icon: Zap,
-    title: 'Auto-Detect Moments',
-    description: 'AI identifies kills, clutches, rage moments, and jump scares with 95% accuracy.',
-  },
-  {
-    icon: Wand2,
-    title: 'Smart Editing',
-    description: 'Automatically trim, crop, and enhance clips with perfect timing and transitions.',
-  },
-  {
-    icon: Download,
-    title: 'One-Click Export',
-    description: 'Export directly to TikTok, YouTube Shorts, and Instagram Reels formats.',
-  },
-]
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-    },
-  },
-}
-
-const itemVariants = {
-  hidden: { y: 20, opacity: 0 },
-  visible: {
-    y: 0,
-    opacity: 1,
-    transition: {
-      duration: 0.5,
-    },
-  },
-}
+import { Sparkles, Scissors, Gamepad2 } from 'lucide-react'
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar variant="landing" />
+    <div style={{ background: '#0A0A0A', minHeight: '100vh', fontFamily: 'Inter, sans-serif' }}>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden px-6 py-24 lg:py-32">
-        {/* Background gradient effects */}
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
-
+      <section
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
+          padding: '0 24px',
+          borderBottom: '1px solid #1F1F1F',
+        }}
+      >
+        {/* Pill badge */}
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: 'rgba(201,168,76,0.08)',
+            border: '1px solid #C9A84C',
+            borderRadius: '999px',
+            padding: '4px 12px',
+            marginBottom: '28px',
+            color: '#C9A84C',
+            fontSize: '0.7rem',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            fontWeight: 500,
+          }}
+        >
+          ✦ AI-Powered Clip Detection
         </div>
 
-        <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={containerVariants}
-          className="relative mx-auto max-w-5xl text-center"
+        {/* Headline */}
+        <h1
+          style={{
+            fontSize: 'clamp(2.5rem, 6vw, 4.5rem)',
+            fontWeight: 700,
+            letterSpacing: '-0.03em',
+            lineHeight: 1.1,
+            marginBottom: '24px',
+          }}
         >
-          <motion.div variants={itemVariants}>
-            <Badge variant="secondary" className="mb-6 px-4 py-1.5 text-sm">
-              <Sparkles className="mr-2 h-3.5 w-3.5" />
-              AI-Powered Video Editing
-            </Badge>
-          </motion.div>
+          <span style={{ color: '#F2F2F2', display: 'block' }}>Find Your Best</span>
+          <span style={{ color: '#C9A84C', display: 'block' }}>Gaming Moments</span>
+        </h1>
 
-          <motion.h1
-            variants={itemVariants}
-            className="text-balance text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl"
-          >
-            Turn 3-hour streams into{' '}
-            <span className="gradient-text">viral clips</span> in 5 minutes
-          </motion.h1>
-
-          <motion.p
-            variants={itemVariants}
-            className="mx-auto mt-6 max-w-2xl text-pretty text-lg text-muted-foreground sm:text-xl"
-          >
-            AI finds your kills, clutches, and rage moments automatically. Stop scrolling through hours of footage - let
-            ClipForge do the work.
-          </motion.p>
-
-          <motion.div variants={itemVariants} className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Button size="lg" className="border border-[#E8FF47] bg-[#1A1A1A] text-[#E8FF47] text-lg hover:bg-[#E8FF47] hover:text-[#0D0D0D] cursor-pointer" asChild>
-              <Link href="/upload">
-                Get Started Free
-              </Link>
-            </Button>
-            <Button size="lg" variant="outline" className="text-lg" asChild>
-              <Link href="#demo">
-                <Play className="mr-2 h-5 w-5" />
-                Watch Demo
-              </Link>
-            </Button>
-          </motion.div>
-        </motion.div>
-      </section>
-
-      {/* Upload Demo Section */}
-      <section id="demo" className="px-6 py-24">
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-          className="mx-auto max-w-4xl"
+        {/* Subtext */}
+        <p
+          style={{
+            color: '#888888',
+            maxWidth: '480px',
+            lineHeight: 1.6,
+            fontSize: '1rem',
+            marginBottom: '40px',
+          }}
         >
-          <div className="rounded-2xl border border-[#2A2A2A] bg-card p-8 lg:p-12">
-            <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-secondary/30 p-12 transition-colors hover:border-primary/50 hover:bg-secondary/50">
-              <motion.div
-                animate={{ y: [0, -8, 0] }}
-                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-                className="gradient-bg mb-6 rounded-2xl p-4"
-              >
-                <Upload className="h-10 w-10 text-white" />
-              </motion.div>
-              <h3 className="mb-2 text-xl font-semibold">Drop your recording here</h3>
-              <p className="mb-6 text-muted-foreground">or click to browse files</p>
-              <div className="flex flex-wrap justify-center gap-2">
-                <Badge variant="outline">.mp4</Badge>
-                <Badge variant="outline">.mov</Badge>
-                <Badge variant="outline">.avi</Badge>
-                <Badge variant="outline">up to 10GB</Badge>
-              </div>
-            </div>
-          </div>
-        </motion.div>
+          Upload your gameplay. Our AI finds the kills, clutches, and highlights automatically.
+        </p>
+
+        {/* Buttons */}
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <Link
+            href="/upload"
+            style={{
+              border: '1px solid #C9A84C',
+              color: '#C9A84C',
+              background: 'transparent',
+              padding: '12px 28px',
+              borderRadius: '6px',
+              fontWeight: 500,
+              fontSize: '0.95rem',
+              textDecoration: 'none',
+              transition: 'background 0.15s, color 0.15s',
+            }}
+            className="btn-primary"
+          >
+            Start for Free
+          </Link>
+          <Link
+            href="/login"
+            style={{
+              border: '1px solid #2A2A2A',
+              color: '#F2F2F2',
+              background: 'transparent',
+              padding: '12px 28px',
+              borderRadius: '6px',
+              fontWeight: 500,
+              fontSize: '0.95rem',
+              textDecoration: 'none',
+              transition: 'background 0.15s',
+            }}
+            className="btn-secondary"
+          >
+            Sign In
+          </Link>
+        </div>
+
+        <style>{`
+          .btn-primary:hover { background: #C9A84C !important; color: #0A0A0A !important; }
+          .btn-secondary:hover { background: #1F1F1F !important; }
+        `}</style>
       </section>
 
       {/* Features Section */}
-      <section id="features" className="px-6 py-24">
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          variants={containerVariants}
-          className="mx-auto max-w-6xl"
+      <section style={{ padding: '80px 24px', maxWidth: '1100px', margin: '0 auto' }}>
+        <h2
+          style={{
+            textAlign: 'center',
+            fontSize: 'clamp(1.5rem, 3vw, 2rem)',
+            fontWeight: 600,
+            color: '#F2F2F2',
+            letterSpacing: '-0.02em',
+            marginBottom: '48px',
+          }}
         >
-          <motion.div variants={itemVariants} className="mb-16 text-center">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-              Everything you need to go <span className="gradient-text">viral</span>
-            </h2>
-            <p className="mt-4 text-lg text-muted-foreground">
-              Powerful AI tools designed for gaming content creators
-            </p>
-          </motion.div>
+          Everything you need
+        </h2>
 
-          <div className="grid gap-8 md:grid-cols-3">
-            {features.map((feature, index) => (
-              <motion.div key={feature.title} variants={itemVariants}>
-                <Card className="h-full border-[#2A2A2A] bg-[#141414] transition-all hover:-translate-y-1">
-                  <CardHeader>
-                    <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-[#2A2A2A] bg-[#1A1A1A]">
-                      <feature.icon className="h-6 w-6 text-[#E8FF47]" />
-                    </div>
-                    <CardTitle className="text-xl">{feature.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription className="text-base">{feature.description}</CardDescription>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: '24px',
+          }}
+        >
+          {/* Feature 1 */}
+          <div
+            style={{
+              background: '#111111',
+              border: '1px solid #1F1F1F',
+              borderRadius: '8px',
+              padding: '24px',
+            }}
+          >
+            <Sparkles style={{ color: '#C9A84C', marginBottom: '16px', width: '24px', height: '24px' }} />
+            <h3 style={{ color: '#F2F2F2', fontWeight: 600, fontSize: '1rem', marginBottom: '8px', letterSpacing: '-0.02em' }}>
+              AI Moment Detection
+            </h3>
+            <p style={{ color: '#888888', fontSize: '0.9rem', lineHeight: 1.6 }}>
+              Gemini AI scans your footage and automatically timestamps every kill, clutch, and highlight.
+            </p>
           </div>
-        </motion.div>
+
+          {/* Feature 2 */}
+          <div
+            style={{
+              background: '#111111',
+              border: '1px solid #1F1F1F',
+              borderRadius: '8px',
+              padding: '24px',
+            }}
+          >
+            <Scissors style={{ color: '#C9A84C', marginBottom: '16px', width: '24px', height: '24px' }} />
+            <h3 style={{ color: '#F2F2F2', fontWeight: 600, fontSize: '1rem', marginBottom: '8px', letterSpacing: '-0.02em' }}>
+              One-Click Cutting
+            </h3>
+            <p style={{ color: '#888888', fontSize: '0.9rem', lineHeight: 1.6 }}>
+              Select a moment and cut it to a shareable clip in seconds. No editing skills required.
+            </p>
+          </div>
+
+          {/* Feature 3 */}
+          <div
+            style={{
+              background: '#111111',
+              border: '1px solid #1F1F1F',
+              borderRadius: '8px',
+              padding: '24px',
+            }}
+          >
+            <Gamepad2 style={{ color: '#C9A84C', marginBottom: '16px', width: '24px', height: '24px' }} />
+            <h3 style={{ color: '#F2F2F2', fontWeight: 600, fontSize: '1rem', marginBottom: '8px', letterSpacing: '-0.02em' }}>
+              Any Game, Any Moment
+            </h3>
+            <p style={{ color: '#888888', fontSize: '0.9rem', lineHeight: 1.6 }}>
+              Works with Valorant, CS2, Fortnite, Apex, and more. Upload and let the AI do the rest.
+            </p>
+          </div>
+        </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="px-6 py-24">
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-          className="mx-auto max-w-4xl"
+      {/* How It Works Section */}
+      <section style={{ padding: '80px 24px', maxWidth: '1100px', margin: '0 auto' }}>
+        <h2
+          style={{
+            textAlign: 'center',
+            fontSize: 'clamp(1.5rem, 3vw, 2rem)',
+            fontWeight: 600,
+            color: '#F2F2F2',
+            letterSpacing: '-0.02em',
+            marginBottom: '48px',
+          }}
         >
-          <div className="relative overflow-hidden rounded-3xl border border-[#2A2A2A] bg-[#141414] p-12 text-center lg:p-16">
+          How it works
+        </h2>
 
-            <h2 className="relative text-3xl font-bold sm:text-4xl">
-              Ready to create viral clips?
-            </h2>
-            <p className="relative mt-4 text-lg text-muted-foreground">
-              Join thousands of creators who save hours every week with ClipForge.
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+            gap: '0',
+          }}
+        >
+          {/* Step 1 */}
+          <div
+            style={{
+              padding: '32px 40px',
+              borderRight: '1px solid #1F1F1F',
+            }}
+          >
+            <div style={{ fontSize: '2.5rem', fontWeight: 700, color: '#C9A84C', lineHeight: 1, marginBottom: '16px' }}>
+              01
+            </div>
+            <h3 style={{ color: '#F2F2F2', fontWeight: 600, fontSize: '1rem', marginBottom: '8px', letterSpacing: '-0.02em' }}>
+              Upload Your Clip
+            </h3>
+            <p style={{ color: '#888888', fontSize: '0.9rem', lineHeight: 1.6 }}>
+              Drop in any gameplay video up to 2GB. MP4, MOV, WebM all supported.
             </p>
-            <Button
-              size="lg"
-              variant="secondary"
-              className="relative mt-8 cursor-pointer border border-[#E8FF47] bg-[#1A1A1A] text-lg font-semibold text-[#E8FF47] hover:bg-[#E8FF47] hover:text-[#0D0D0D]"
-              asChild
-            >
-              <Link href="/upload">Start for free</Link>
-            </Button>
           </div>
-        </motion.div>
+
+          {/* Step 2 */}
+          <div
+            style={{
+              padding: '32px 40px',
+              borderRight: '1px solid #1F1F1F',
+            }}
+          >
+            <div style={{ fontSize: '2.5rem', fontWeight: 700, color: '#C9A84C', lineHeight: 1, marginBottom: '16px' }}>
+              02
+            </div>
+            <h3 style={{ color: '#F2F2F2', fontWeight: 600, fontSize: '1rem', marginBottom: '8px', letterSpacing: '-0.02em' }}>
+              AI Finds the Moments
+            </h3>
+            <p style={{ color: '#888888', fontSize: '0.9rem', lineHeight: 1.6 }}>
+              Our AI watches your footage and pinpoints the most exciting moments with timestamps.
+            </p>
+          </div>
+
+          {/* Step 3 */}
+          <div
+            style={{
+              padding: '32px 40px',
+            }}
+          >
+            <div style={{ fontSize: '2.5rem', fontWeight: 700, color: '#C9A84C', lineHeight: 1, marginBottom: '16px' }}>
+              03
+            </div>
+            <h3 style={{ color: '#F2F2F2', fontWeight: 600, fontSize: '1rem', marginBottom: '8px', letterSpacing: '-0.02em' }}>
+              Cut &amp; Download
+            </h3>
+            <p style={{ color: '#888888', fontSize: '0.9rem', lineHeight: 1.6 }}>
+              Review the detected highlights, cut the ones you want, and download them instantly.
+            </p>
+          </div>
+        </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border px-6 py-12">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 md:flex-row">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#E8FF47] bg-[#1A1A1A]">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                className="h-5 w-5 text-[#E8FF47]"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polygon points="23 7 16 12 23 17 23 7" />
-                <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-              </svg>
-            </div>
-            <span className="font-bold">ClipForge</span>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} ClipForge. All rights reserved.
-          </p>
+      <footer
+        style={{
+          borderTop: '1px solid #1F1F1F',
+          background: '#0A0A0A',
+          padding: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Scissors style={{ color: '#C9A84C', width: '18px', height: '18px' }} />
+          <span style={{ color: '#F2F2F2', fontWeight: 600, fontSize: '0.95rem' }}>ClipForge</span>
         </div>
+        <span style={{ color: '#555555', fontSize: '0.85rem' }}>Built for gamers.</span>
       </footer>
     </div>
   )

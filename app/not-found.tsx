@@ -28,7 +28,7 @@ export default function NotFound() {
           </p>
 
           <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Button className="gradient-bg glow-hover w-full text-white sm:w-auto" asChild>
+            <Button className="gradient-bg w-full text-white sm:w-auto" asChild>
               <Link href="/dashboard">
                 <Home className="mr-2 h-4 w-4" />
                 Back to dashboard

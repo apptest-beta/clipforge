@@ -212,7 +212,7 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-bold">My Videos</h1>
           <p className="mt-1 text-muted-foreground">Manage your gaming footage and clips</p>
         </div>
-        <Button className="shrink-0 border border-[#E8FF47] bg-[#1A1A1A] text-[#E8FF47] hover:bg-[#E8FF47] hover:text-[#0D0D0D] cursor-pointer" asChild>
+        <Button className="shrink-0 border border-[var(--accent)] bg-[var(--surface)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[#0A0A0A] cursor-pointer" asChild>
           <Link href="/upload">
             <Upload className="mr-2 h-4 w-4" />
             Upload Video
@@ -232,12 +232,12 @@ export default function DashboardPage() {
           animate={{ opacity: 1, scale: 1 }}
           className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 py-24"
         >
-          <div className="gradient-bg mb-6 rounded-2xl p-4">
-            <Film className="h-10 w-10 text-white" />
+          <div className="mb-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
+            <Film className="h-10 w-10 text-[var(--accent)]" />
           </div>
           <h2 className="mb-2 text-xl font-semibold">No videos yet</h2>
           <p className="mb-6 text-muted-foreground">Upload your first gaming clip to get started</p>
-          <Button className="border border-[#E8FF47] bg-[#1A1A1A] text-[#E8FF47] hover:bg-[#E8FF47] hover:text-[#0D0D0D] cursor-pointer" asChild>
+          <Button className="border border-[var(--accent)] bg-[var(--surface)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[#0A0A0A] cursor-pointer" asChild>
             <Link href="/upload">
               <Upload className="mr-2 h-4 w-4" />
               Upload Video

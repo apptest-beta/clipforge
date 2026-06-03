@@ -51,12 +51,12 @@ const games = [
 ]
 
 const momentTypes = [
-  { id: 'kills', label: 'Kills', icon: Crosshair, color: 'text-red-500' },
-  { id: 'deaths', label: 'Deaths', icon: Skull, color: 'text-gray-400' },
-  { id: 'clutches', label: 'Clutches', icon: Trophy, color: 'text-yellow-500' },
-  { id: 'funny', label: 'Funny Moments', icon: Laugh, color: 'text-blue-500' },
-  { id: 'rage', label: 'Rage', icon: Angry, color: 'text-orange-500' },
-  { id: 'jumpscares', label: 'Jump Scares', icon: Ghost, color: 'text-purple-500' },
+  { id: 'kills', label: 'Kills', icon: Crosshair, color: 'text-[#E85D5D]' },
+  { id: 'deaths', label: 'Deaths', icon: Skull, color: 'text-[#888888]' },
+  { id: 'clutches', label: 'Clutches', icon: Trophy, color: 'text-[#C9A84C]' },
+  { id: 'funny', label: 'Funny Moments', icon: Laugh, color: 'text-[#60A5FA]' },
+  { id: 'rage', label: 'Rage', icon: Angry, color: 'text-[#E8A838]' },
+  { id: 'jumpscares', label: 'Jump Scares', icon: Ghost, color: 'text-[#C9A84C]' },
 ]
 
 const { uploadFiles } = genUploader<OurFileRouter>()
@@ -232,11 +232,11 @@ export default function UploadPage() {
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
-                  className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-12 transition-all ${
-                    isDragging
-                      ? 'border-[#E8FF47] bg-[#E8FF47]/5'
-                      : 'border-border bg-secondary/30 hover:border-primary/50 hover:bg-secondary/50'
-                  }`}
+                  style={{
+                    borderColor: isDragging ? '#C9A84C' : '#2A2A2A',
+                    background: isDragging ? 'rgba(201,168,76,0.05)' : 'transparent',
+                  }}
+                  className="relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-12 transition-all"
                 >
                   <input
                     type="file"
@@ -246,9 +246,9 @@ export default function UploadPage() {
                   />
                   <motion.div
                     animate={{ y: isDragging ? -10 : 0 }}
-                    className="mb-6 rounded-2xl border border-[#2A2A2A] bg-[#1A1A1A] p-4"
+                    className="mb-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)] p-4"
                   >
-                    <Upload className="h-10 w-10 text-[#E8FF47]" />
+                    <Upload className="h-10 w-10 text-[var(--accent)]" />
                   </motion.div>
                   <h3 className="mb-2 text-xl font-semibold">
                     {isDragging ? 'Drop your file here' : 'Drop your recording here'}
@@ -272,8 +272,8 @@ export default function UploadPage() {
                   className="rounded-xl border border-border bg-secondary/30 p-4"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-[#2A2A2A] bg-[#1A1A1A]">
-                      <FileVideo className="h-7 w-7 text-[#E8FF47]" />
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)]">
+                      <FileVideo className="h-7 w-7 text-[var(--accent)]" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{file.name}</p>
@@ -363,8 +363,8 @@ export default function UploadPage() {
                         onClick={() => handleMomentToggle(moment.id)}
                         className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-all ${
                           selectedMoments.includes(moment.id)
-                            ? 'border-[#E8FF47] bg-[#E8FF47]/5'
-                            : 'border-[#222222] hover:border-[#E8FF47]/50'
+                            ? 'border-[var(--accent)] bg-[var(--accent)]/5'
+                            : 'border-[#222222] hover:border-[var(--accent)]/50'
                         }`}
                       >
                         <Checkbox
@@ -394,7 +394,7 @@ export default function UploadPage() {
           onClick={handleUpload}
           disabled={!file || !game || isUploading}
           size="lg"
-          className="w-full text-lg border border-[#E8FF47] bg-[#1A1A1A] text-[#E8FF47] hover:bg-[#E8FF47] hover:text-[#0D0D0D]"
+          className="w-full text-lg border border-[var(--accent)] bg-[var(--surface)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[#0A0A0A]"
         >
           {isUploading ? (
             <>

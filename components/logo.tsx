@@ -8,11 +8,11 @@ export function Logo({ size = 'default' }: { size?: 'default' | 'large' }) {
 
   return (
     <Link href="/" className="flex items-center gap-2">
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#E8FF47] bg-[#1A1A1A]">
-        <Scissors className="h-4 w-4 text-[#E8FF47]" />
+      <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--accent)] bg-[var(--surface)]">
+        <Scissors className="h-4 w-4 text-[var(--accent)]" />
       </div>
       <span className={`font-bold ${textSize}`}>
-        <span className="text-[#E8FF47]">Clip</span>
+        <span className="text-[var(--accent)]">Clip</span>
         <span className="text-foreground">Forge</span>
       </span>
     </Link>

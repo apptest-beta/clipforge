@@ -150,7 +150,7 @@ export default function SettingsPage() {
             <div className="flex items-center gap-6">
               <Avatar className="h-16 w-16">
                 <AvatarImage src="/avatar.png" alt="Profile" />
-                <AvatarFallback className="bg-[#1A1A1A] border border-[#E8FF47] text-[#E8FF47] text-xl font-bold">
+                <AvatarFallback className="bg-[var(--surface)] border border-[var(--accent)] text-[var(--accent)] text-xl font-bold">
                   {initial}
                 </AvatarFallback>
               </Avatar>
@@ -195,7 +195,7 @@ export default function SettingsPage() {
             <Button
               onClick={handleSave}
               disabled={saving || !profile}
-              className="cursor-pointer border border-[#E8FF47] bg-[#1A1A1A] text-[#E8FF47] hover:bg-[#E8FF47] hover:text-[#0D0D0D]"
+              className="cursor-pointer border border-[var(--accent)] bg-[var(--surface)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[#0A0A0A]"
             >
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Save Changes
@@ -212,7 +212,7 @@ export default function SettingsPage() {
             <Button
               variant="outline"
               onClick={handleSignOut}
-              className="cursor-pointer border-[#444444] text-[#EDEDED] hover:bg-[#1A1A1A]"
+              className="cursor-pointer border-[#444444] text-[#EDEDED] hover:bg-[var(--surface)]"
             >
               <LogOut className="mr-2 h-4 w-4" />
               Sign out

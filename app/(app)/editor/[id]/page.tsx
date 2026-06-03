@@ -380,7 +380,7 @@ export default function EditorPage() {
               <Button
                 onClick={handleExportSelected}
                 disabled={selectedCount === 0}
-                className="gradient-bg glow w-full text-white"
+                className="gradient-bg w-full text-white"
               >
                 <Download className="mr-2 h-4 w-4" />
                 Export Selected ({selectedCount})

@@ -86,7 +86,7 @@ export function VideoCard({
       }}
       className="cursor-pointer"
     >
-      <Card className="group overflow-hidden transition-all hover:border-[#2A2A2A]">
+      <Card className="group overflow-hidden transition-all hover:border-[var(--border-subtle)]">
         <div className="relative aspect-video overflow-hidden bg-secondary">
           <div
             className="absolute inset-0 bg-cover bg-center transition-transform duration-300 group-hover:scale-105"
@@ -98,7 +98,7 @@ export function VideoCard({
             <div
               className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100"
             >
-              <div className="flex h-14 w-14 items-center justify-center rounded-full border border-[#E8FF47] bg-[#1A1A1A] shadow-lg">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full border border-[var(--accent)] bg-[var(--surface)] shadow-lg">
                 <Play className="h-6 w-6 text-white" fill="white" />
               </div>
             </div>

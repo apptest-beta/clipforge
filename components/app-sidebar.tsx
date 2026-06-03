@@ -94,10 +94,11 @@ export function AppSidebar() {
     <motion.aside
       initial={{ x: -20, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
-      className="fixed left-0 top-16 z-40 hidden h-[calc(100vh-4rem)] w-64 border-r border-border bg-sidebar lg:block"
+      style={{ background: '#0D0D0D', borderRight: '1px solid #1F1F1F' }}
+      className="fixed left-0 top-16 z-40 hidden h-[calc(100vh-4rem)] w-64 lg:block"
     >
       <div className="flex h-full flex-col p-4">
-        <Button className="mb-6 w-full cursor-pointer border border-[#E8FF47] bg-[#1A1A1A] text-[#E8FF47] hover:bg-[#E8FF47] hover:text-[#0D0D0D]" asChild>
+        <Button className="mb-6 w-full cursor-pointer border border-[var(--accent)] bg-[var(--surface)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[#0A0A0A]" asChild>
           <Link href="/upload">
             <Plus className="mr-2 h-4 w-4" />
             Upload Video
@@ -111,14 +112,22 @@ export function AppSidebar() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all',
+                style={
                   isActive
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                    : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                    ? {
+                        borderLeft: '3px solid #C9A84C',
+                        background: 'rgba(201,168,76,0.08)',
+                        color: '#C9A84C',
+                        borderRadius: '0 6px 6px 0',
+                      }
+                    : { color: '#888888' }
+                }
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2 text-sm transition-all',
+                  !isActive && 'rounded-lg hover:bg-[#111111] hover:text-[#F2F2F2]'
                 )}
               >
-                <item.icon className={cn('h-4 w-4', isActive && 'text-primary')} />
+                <item.icon className="h-4 w-4" style={isActive ? { color: '#C9A84C' } : {}} />
                 {item.label}
               </Link>
             )

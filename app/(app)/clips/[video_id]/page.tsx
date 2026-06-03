@@ -257,7 +257,7 @@ export default function ClipsPage() {
           animate={{ opacity: 1, scale: 1 }}
           className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 py-24"
         >
-          <div className="mb-6 rounded-2xl border border-[#2A2A2A] bg-[#1A1A1A] p-4">
+          <div className="mb-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
             <Film className="h-10 w-10 text-[#888888]" />
           </div>
           <h2 className="mb-2 text-xl font-semibold">No highlights found</h2>
@@ -284,7 +284,7 @@ export default function ClipsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.04 }}
               >
-                <Card className="overflow-hidden transition-all glow-hover">
+                <Card className="overflow-hidden transition-all">
                   {clip.thumbnail_url && (
                     <div className="relative aspect-video w-full overflow-hidden bg-secondary">
                       <div
