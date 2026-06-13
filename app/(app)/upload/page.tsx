@@ -154,6 +154,15 @@ export default function UploadPage() {
       setUploadProgress(50)
       setStatusLabel('Analyzing with AI...')
 
+      const effectiveGame = game || 'other'
+      const analyzePayload = {
+        fileName: file.name,
+        fileUrl,
+        game: effectiveGame,
+        momentTypes: selectedMoments,
+      }
+      console.log('[upload] sending to /api/analyze:', analyzePayload)
+
       // Fake progress tick: nudge from 50% toward 95% every 2s while analysis runs
       let fakePct = 50
       const ticker = setInterval(() => {
@@ -167,12 +176,7 @@ export default function UploadPage() {
         response = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fileName: file.name,
-            fileUrl,
-            game,
-            momentTypes: selectedMoments,
-          }),
+          body: JSON.stringify(analyzePayload),
         })
       } finally {
         clearInterval(ticker)
@@ -180,7 +184,7 @@ export default function UploadPage() {
 
       if (!response || !response.ok) {
         const errJson = response ? await response.json().catch(() => ({})) : {}
-        throw new Error((errJson as { error?: string }).error || 'Analysis failed')
+        throw new Error((errJson as { error?: string }).error || `Analysis failed (${response?.status ?? 'no response'})`)
       }
 
       await response.json()
@@ -401,12 +405,13 @@ export default function UploadPage() {
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
               Processing...
             </>
+          
           ) : (
             <>
               <Sparkles className="mr-2 h-5 w-5" />
               Start Processing
             </>
-                )}
+          )}
         </Button>
       </motion.div>
     </div>

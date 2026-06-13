@@ -1,47 +1,24 @@
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Film, Home, Upload } from 'lucide-react'
 
 export default function NotFound() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-6 py-12">
-      <div className="relative w-full max-w-xl text-center">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -inset-x-20 -top-20 h-72 opacity-30 blur-3xl gradient-bg"
-        />
-
-        <div className="relative">
-          <div className="mx-auto mb-8 inline-flex h-20 w-20 items-center justify-center rounded-3xl gradient-bg shadow-lg">
-            <Film className="h-10 w-10 text-white" />
-          </div>
-
-          <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-            Error 404
-          </p>
-          <h1 className="mb-4 bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-5xl font-bold text-transparent sm:text-6xl">
-            Clip not found
-          </h1>
-          <p className="mx-auto mb-10 max-w-md text-lg text-muted-foreground">
-            The page you&apos;re looking for doesn&apos;t exist or has been moved.
-            Let&apos;s get you back to your clips.
-          </p>
-
-          <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Button className="gradient-bg w-full text-white sm:w-auto" asChild>
-              <Link href="/dashboard">
-                <Home className="mr-2 h-4 w-4" />
-                Back to dashboard
-              </Link>
-            </Button>
-            <Button variant="outline" className="w-full gradient-border sm:w-auto" asChild>
-              <Link href="/upload">
-                <Upload className="mr-2 h-4 w-4" />
-                Upload a video
-              </Link>
-            </Button>
-          </div>
+    <div style={{ minHeight: '100vh', background: '#0A0A0A', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '48px 24px' }}>
+      <div>
+        <div className="font-display" style={{ fontSize: '6rem', fontWeight: 700, color: '#C9A84C', lineHeight: 1, marginBottom: '16px', letterSpacing: '-0.04em' }}>
+          404
         </div>
+        <h1 className="font-display" style={{ fontSize: '1.75rem', fontWeight: 600, color: '#F2F2F2', marginBottom: '12px', letterSpacing: '-0.02em' }}>
+          Page not found
+        </h1>
+        <p style={{ color: '#888888', fontSize: '1rem', maxWidth: '380px', marginBottom: '36px', lineHeight: 1.6 }}>
+          The page you&apos;re looking for doesn&apos;t exist.
+        </p>
+        <Link
+          href="/"
+          style={{ border: '1px solid #C9A84C', color: '#C9A84C', background: 'transparent', padding: '10px 24px', borderRadius: '6px', fontWeight: 500, fontSize: '0.9rem', textDecoration: 'none', display: 'inline-block' }}
+        >
+          Go Home
+        </Link>
       </div>
     </div>
   )

@@ -1,3 +1,4 @@
 allowBuilds:
   ffmpeg-static: true
+  msgpackr-extract: true
   sharp: false

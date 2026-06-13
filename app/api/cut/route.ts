@@ -1,5 +1,7 @@
 // Forwards cut requests to the Railway microservice (clipforge-cutter).
 // Required env vars: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
+export const dynamic = 'force-dynamic'
+
 import { type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { rateLimit } from '@/lib/security/rate-limit'
@@ -15,6 +17,7 @@ export async function POST(request: NextRequest) {
     // Rate limit: 20 cut requests per minute per IP
     const limit = await rateLimit(request, 'cut', 20, 60)
     if (!limit.success) {
+      console.warn('[rate-limit] hit on /api/cut')
       return secureError('Too many requests, please slow down', 429, undefined, {
         'Retry-After': String(limit.retryAfter),
       })
@@ -109,11 +112,14 @@ export async function POST(request: NextRequest) {
       return secureError('Cut service returned no clip_url', 500)
     }
 
-    // Update the clips row with the new clip_url
+    // Update the clips row with the new clip_url — filter by all three fields
+    // to avoid updating every clip for this video
     const { error: updateError } = await supabase
       .from('clips')
       .update({ clip_url: clipUrl })
       .eq('video_id', videoId)
+      .eq('start_time', startTime)
+      .eq('end_time', endTime)
 
     if (updateError) {
       console.error('[cut] failed to update clip_url:', updateError)

@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -50,6 +51,7 @@ export function VideoCard({
   onDelete,
 }: VideoCardProps) {
   const router = useRouter()
+  const [hovered, setHovered] = useState(false)
   const goToClips = () => router.push(`/clips/${id}`)
 
   const statusConfig = {
@@ -73,7 +75,6 @@ export function VideoCard({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -4 }}
       transition={{ duration: 0.2 }}
       onClick={goToClips}
       role="link"
@@ -85,8 +86,21 @@ export function VideoCard({
         }
       }}
       className="cursor-pointer"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        transform: hovered ? 'translateY(-4px)' : 'translateY(0)',
+        transition: 'transform 200ms ease-out',
+      }}
     >
-      <Card className="group overflow-hidden transition-all hover:border-[var(--border-subtle)]">
+      <Card
+        className="group overflow-hidden"
+        style={{
+          borderTop: `2px solid ${hovered ? '#C9A84C' : 'transparent'}`,
+          boxShadow: hovered ? '0 8px 24px rgba(0,0,0,0.4)' : 'none',
+          transition: 'border-color 200ms ease-out, box-shadow 200ms ease-out',
+        }}
+      >
         <div className="relative aspect-video overflow-hidden bg-secondary">
           <div
             className="absolute inset-0 bg-cover bg-center transition-transform duration-300 group-hover:scale-105"
@@ -159,12 +173,8 @@ export function VideoCard({
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  className="text-destructive"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    onDelete?.(id)
-                  }}
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => onDelete?.(id)}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete

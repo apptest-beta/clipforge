@@ -1,6 +1,8 @@
 // Required env vars:
 //   GEMINI_API_KEY, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
 //   CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+export const dynamic = 'force-dynamic'
+
 import { NextRequest } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { v2 as cloudinary } from 'cloudinary'
@@ -84,6 +86,7 @@ const ALLOWED_KEYS = ['game', 'momentTypes', 'fileName', 'fileUrl', 'durationSec
 export async function POST(request: NextRequest) {
   const limit = await rateLimit(request, 'analyze', 10, 60)
   if (!limit.success) {
+    console.warn('[rate-limit] hit on /api/analyze')
     return secureError('Too many requests, please slow down', 429, undefined, {
       'Retry-After': String(limit.retryAfter),
     })

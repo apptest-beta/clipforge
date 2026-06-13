@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
+import { StaggerContainer, StaggerItem, HoverLift, FadeIn } from '@/components/motion/motion-primitives'
 import { VideoCard, VideoCardProps } from '@/components/video-card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -46,7 +47,7 @@ function DashboardSkeleton() {
       <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="overflow-hidden rounded-xl border border-border bg-card">
-            <Skeleton className="aspect-video w-full" />
+            <Skeleton className="skeleton-shimmer aspect-video w-full" />
             <div className="space-y-3 p-4">
               <Skeleton className="h-5 w-3/4" />
               <div className="flex items-center gap-3">
@@ -227,11 +228,8 @@ export default function DashboardPage() {
           <p className="text-destructive">Failed to load videos: {error}</p>
         </div>
       ) : isEmpty ? (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 py-24"
-        >
+        <FadeIn>
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 py-24">
           <div className="mb-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
             <Film className="h-10 w-10 text-[var(--accent)]" />
           </div>
@@ -243,7 +241,8 @@ export default function DashboardPage() {
               Upload Video
             </Link>
           </Button>
-        </motion.div>
+        </div>
+        </FadeIn>
       ) : (
         <>
           <motion.div
@@ -293,27 +292,21 @@ export default function DashboardPage() {
             </div>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
+          <StaggerContainer
             className={
               view === 'grid'
                 ? 'grid gap-6 sm:grid-cols-2 xl:grid-cols-3'
                 : 'flex flex-col gap-4'
             }
           >
-            {filteredVideos.map((video, index) => (
-              <motion.div
-                key={video.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-              >
-                <VideoCard {...video} onDelete={handleDelete} />
-              </motion.div>
+            {filteredVideos.map((video) => (
+              <StaggerItem key={video.id}>
+                <HoverLift>
+                  <VideoCard {...video} onDelete={handleDelete} />
+                </HoverLift>
+              </StaggerItem>
             ))}
-          </motion.div>
+          </StaggerContainer>
 
           {filteredVideos.length === 0 && (
             <div className="py-12 text-center">

@@ -100,31 +100,46 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-sans, 'Inter', sans-serif);
     background-color: #0A0A0A;
     color: #F2F2F2;
   }
   h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display, 'Space Grotesk', sans-serif);
     font-weight: 600;
     letter-spacing: -0.02em;
   }
 }
 
-.gradient-text {
-  color: var(--accent);
+.font-display {
+  font-family: var(--font-display, 'Space Grotesk', sans-serif);
 }
 
-.gradient-bg {
-  background-color: var(--surface);
-  border: 1px solid var(--accent);
-  color: var(--accent);
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-.gradient-border {
-  position: relative;
-  border: 1px solid #1F1F1F;
+.reveal {
+  animation: fade-up 400ms ease-out both;
+  animation-delay: var(--delay, 0ms);
 }
 
-.gradient-border::before {
-  content: none;
+@media (prefers-reduced-motion: reduce) {
+  .reveal { animation: none; }
+}
+
+html { scroll-behavior: smooth; }
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton-shimmer {
+  background: linear-gradient(90deg, #111111 25%, #1A1A1A 50%, #111111 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shimmer { animation: none; }
 }

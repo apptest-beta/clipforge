@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
+import { FadeIn, StaggerContainer, StaggerItem, HoverLift } from '@/components/motion/motion-primitives'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
@@ -252,11 +253,8 @@ export default function ClipsPage() {
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       ) : clips.length === 0 ? (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 py-24"
-        >
+        <FadeIn>
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 py-24">
           <div className="mb-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
             <Film className="h-10 w-10 text-[#888888]" />
           </div>
@@ -265,118 +263,147 @@ export default function ClipsPage() {
           <Button className="gradient-bg text-white" asChild>
             <Link href="/dashboard">Back to dashboard</Link>
           </Button>
-        </motion.div>
+        </div>
+        </FadeIn>
       ) : (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1 }}
-          className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
-        >
+        <StaggerContainer className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {clips.map((clip, index) => {
             const duration = Math.max(0, clip.end_time - clip.start_time)
             const isCutting = cuttingIds.has(clip.id)
 
             return (
-              <motion.div
-                key={clip.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.04 }}
-              >
-                <Card className="overflow-hidden transition-all">
-                  {clip.thumbnail_url && (
-                    <div className="relative aspect-video w-full overflow-hidden bg-secondary">
-                      <div
-                        className="absolute inset-0 bg-cover bg-center transition-transform duration-300 hover:scale-105"
-                        style={{ backgroundImage: `url(${clip.thumbnail_url})` }}
-                        role="img"
-                        aria-label={`${clip.moment_type || 'clip'} preview`}
-                      />
-                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                    </div>
-                  )}
-                  <CardContent className="p-5">
-                    <div className="mb-4 flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-2 flex items-center gap-2">
-                          <Target className="h-4 w-4 text-muted-foreground" />
-                          <h3 className="truncate font-semibold capitalize">
-                            {clip.moment_type || 'Moment'}
-                          </h3>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Clock className="h-3.5 w-3.5" />
-                          <span>
-                            {formatTime(clip.start_time)} {'→'} {formatTime(clip.end_time)}
-                          </span>
-                          <span className="text-xs">{'·'}</span>
-                          <span>{duration.toFixed(1)}s</span>
-                        </div>
-                      </div>
-                      <Badge
-                        variant="outline"
-                        className={confidenceColor(clip.confidence)}
-                      >
-                        {Math.round(safeConfidence(clip.confidence))}%
-                      </Badge>
-                    </div>
-
-                    <div className="mb-4 flex items-center gap-2">
-                      {clip.clip_url ? (
-                        <Badge
-                          variant="outline"
-                          className="border-green-500/30 bg-green-500/20 text-green-500"
-                        >
-                          Cut ready
-                        </Badge>
-                      ) : (
-                        <Badge
-                          variant="outline"
-                          className="border-muted-foreground/30 bg-muted/40 text-muted-foreground"
-                        >
-                          Not cut yet
-                        </Badge>
-                      )}
-                      <Badge variant="outline" className="border-border bg-secondary/50 text-muted-foreground">
-                        {Math.round(clip.end_time - clip.start_time)}s
-                      </Badge>
-                    </div>
-
-                    <div className="flex gap-2">
-                      {clip.clip_url ? (
-                        <Button
-                          className="flex-1 cursor-pointer border border-green-500 bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white"
-                          asChild
-                        >
-                          <a href={clip.clip_url} target="_blank" rel="noopener noreferrer" download>
-                            <Download className="mr-2 h-4 w-4" />
-                            Download
-                          </a>
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="secondary"
-                          className="flex-1 cursor-pointer"
-                          onClick={() => handleCut(clip.id)}
-                          disabled={isCutting}
-                        >
-                          {isCutting ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <Scissors className="mr-2 h-4 w-4" />
-                          )}
-                          {isCutting ? 'Cutting...' : 'Cut Clip'}
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
+              <StaggerItem key={clip.id}>
+                <HoverLift>
+                  <ClipCard
+                    clip={clip}
+                    index={index}
+                    duration={duration}
+                    isCutting={isCutting}
+                    onCut={handleCut}
+                  />
+                </HoverLift>
+              </StaggerItem>
             )
           })}
-        </motion.div>
+        </StaggerContainer>
       )}
     </div>
+  )
+}
+
+function ClipCard({
+  clip,
+  index,
+  duration,
+  isCutting,
+  onCut,
+}: {
+  clip: Clip
+  index: number
+  duration: number
+  isCutting: boolean
+  onCut: (id: string) => void
+}) {
+  return (
+    <Card className="overflow-hidden">
+        {clip.thumbnail_url && (
+          <div className="relative aspect-video w-full overflow-hidden bg-secondary">
+            <div
+              className="absolute inset-0 bg-cover bg-center transition-transform duration-300 hover:scale-105"
+              style={{ backgroundImage: `url(${clip.thumbnail_url})` }}
+              role="img"
+              aria-label={`${clip.moment_type || 'clip'} preview`}
+            />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+          </div>
+        )}
+        <CardContent className="p-5">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="mb-2 flex items-center gap-2">
+                <Target className="h-4 w-4 text-muted-foreground" />
+                <h3 className="truncate font-semibold capitalize">
+                  {clip.moment_type || 'Moment'}
+                </h3>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Clock className="h-3.5 w-3.5" />
+                <span>
+                  {formatTime(clip.start_time)} {'→'} {formatTime(clip.end_time)}
+                </span>
+                <span className="text-xs">{'·'}</span>
+                <span>{duration.toFixed(1)}s</span>
+              </div>
+            </div>
+            <Badge variant="outline" className={confidenceColor(clip.confidence)}>
+              {Math.round(safeConfidence(clip.confidence))}%
+            </Badge>
+          </div>
+
+          <div className="mb-4 flex items-center gap-2">
+            {clip.clip_url ? (
+              <Badge variant="outline" className="border-green-500/30 bg-green-500/20 text-green-500">
+                Cut ready
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="border-muted-foreground/30 bg-muted/40 text-muted-foreground">
+                Not cut yet
+              </Badge>
+            )}
+            <Badge variant="outline" className="border-border bg-secondary/50 text-muted-foreground">
+              {Math.round(clip.end_time - clip.start_time)}s
+            </Badge>
+          </div>
+
+          <div className="flex gap-2">
+            <AnimatePresence mode="wait">
+              {clip.clip_url ? (
+                <motion.a
+                  key="download"
+                  href={clip.clip_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex-1 cursor-pointer inline-flex items-center justify-center rounded-md border border-green-500 bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white px-4 py-2 text-sm font-medium transition-colors"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Download
+                </motion.a>
+              ) : (
+                <Button
+                  key="cut"
+                  variant="secondary"
+                  className="flex-1 cursor-pointer"
+                  onClick={() => onCut(clip.id)}
+                  disabled={isCutting}
+                >
+                  {isCutting ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Scissors className="mr-2 h-4 w-4" />
+                  )}
+                  {isCutting ? 'Cutting...' : 'Cut Clip'}
+                </Button>
+              )}
+            </AnimatePresence>
+            <Button
+              variant="secondary"
+              className="cursor-pointer"
+              disabled={!clip.clip_url}
+              asChild={!!clip.clip_url}
+            >
+              {clip.clip_url ? (
+                <a href={`/api/export?clip_id=${clip.id}`} target="_blank" rel="noopener noreferrer">
+                  Export
+                </a>
+              ) : (
+                <span>Export</span>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
   )
 }

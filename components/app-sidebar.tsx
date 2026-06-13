@@ -49,8 +49,6 @@ export function AppSidebar() {
         return
       }
 
-      // Newest clips first, joined with parent video for the game label.
-      // Inner-join filters to clips whose parent video belongs to this user.
       const { data, error } = await supabase
         .from('clips')
         .select('id, video_id, moment_type, clip_url, videos!inner(game, user_id)')
@@ -98,12 +96,14 @@ export function AppSidebar() {
       className="fixed left-0 top-16 z-40 hidden h-[calc(100vh-4rem)] w-64 lg:block"
     >
       <div className="flex h-full flex-col p-4">
-        <Button className="mb-6 w-full cursor-pointer border border-[var(--accent)] bg-[var(--surface)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[#0A0A0A]" asChild>
-          <Link href="/upload">
-            <Plus className="mr-2 h-4 w-4" />
-            Upload Video
-          </Link>
-        </Button>
+        <motion.div whileHover={{ scale: 1.03 }} transition={{ type: 'spring', stiffness: 300, damping: 20 }}>
+          <Button className="mb-6 w-full cursor-pointer border border-[var(--accent)] bg-[var(--surface)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[#0A0A0A]" asChild>
+            <Link href="/upload">
+              <Plus className="mr-2 h-4 w-4" />
+              Upload Video
+            </Link>
+          </Button>
+        </motion.div>
 
         <nav className="space-y-1">
           {navItems.map((item) => {
@@ -127,8 +127,14 @@ export function AppSidebar() {
                   !isActive && 'rounded-lg hover:bg-[#111111] hover:text-[#F2F2F2]'
                 )}
               >
-                <item.icon className="h-4 w-4" style={isActive ? { color: '#C9A84C' } : {}} />
-                {item.label}
+                <motion.span
+                  className="flex items-center gap-3"
+                  whileHover={{ x: 2 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <item.icon className="h-4 w-4" style={isActive ? { color: '#C9A84C' } : {}} />
+                  {item.label}
+                </motion.span>
               </Link>
             )
           })}
