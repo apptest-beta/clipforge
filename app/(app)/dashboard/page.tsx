@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { StaggerContainer, StaggerItem, HoverLift, FadeIn } from '@/components/motion/motion-primitives'
@@ -18,15 +18,29 @@ import { Upload, Search, Grid3x3, List, Film } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { supabase } from '@/lib/supabase'
 import { cleanFilename } from '@/lib/utils'
+import { getGuestId } from '@/lib/guest'
 import { toast } from 'sonner'
 
 // Turn a Cloudinary video URL into a first-frame JPG thumbnail.
 // Inserts so_0 (start offset 0s) and swaps the video extension for .jpg.
+// Cloudinary "fetch" delivery URLs can't be transformed this way - they're
+// returned as-is by the .replace() calls and 401 when loaded (fetch
+// delivery is disabled for this account), so treat them as unusable.
 function cloudinaryThumbnail(url: string | null | undefined): string {
-  if (!url) return ''
+  if (!url || url.includes('/video/fetch/')) return ''
   return url
     .replace('/video/upload/', '/video/upload/so_0/')
     .replace(/\.(mp4|mov|webm|mkv|avi)(\?|$)/i, '.jpg$2')
+}
+
+// Pick a directly-playable source for client-side thumbnail capture.
+// `cloudinary_public_id` holds the raw Uploadthing URL (CORS-enabled and
+// directly downloadable) when `file_url` is an unusable Cloudinary "fetch"
+// delivery URL.
+function pickVideoSrc(file_url: string | null, cloudinary_public_id: string | null): string | null {
+  if (cloudinary_public_id?.startsWith('http')) return cloudinary_public_id
+  if (file_url?.startsWith('http') && !file_url.includes('/video/fetch/')) return file_url
+  return null
 }
 
 function normalizeStatus(status: string | null | undefined): VideoCardProps['status'] {
@@ -69,6 +83,13 @@ export default function DashboardPage() {
   const [videos, setVideos] = useState<VideoCardProps[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Sources to capture a first-frame thumbnail from, for videos whose
+  // `file_url` is a broken Cloudinary "fetch" delivery URL.
+  const [captureSources, setCaptureSources] = useState<Record<string, string>>({})
+  // Captured first-frame thumbnails (video id -> data URL).
+  const [capturedThumbnails, setCapturedThumbnails] = useState<Record<string, string>>({})
+  const captureVideoRef = useRef<HTMLVideoElement>(null)
+  const captureCanvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -79,7 +100,10 @@ export default function DashboardPage() {
 
       const { data: userData } = await supabase.auth.getUser()
       const user = userData?.user
-      if (!user) {
+      // Guests have no Supabase session - fall back to the client-minted
+      // guest ID that uploads were saved under (see lib/guest.ts).
+      const ownerId = user?.id ?? getGuestId()
+      if (!ownerId) {
         if (!cancelled) {
           setVideos([])
           setLoading(false)
@@ -89,8 +113,8 @@ export default function DashboardPage() {
 
       const { data: videosData, error: vErr } = await supabase
         .from('videos')
-        .select('id, title, file_name, file_url, game, status, created_at')
-        .eq('user_id', user.id)
+        .select('id, title, file_name, file_url, cloudinary_public_id, game, status, created_at')
+        .eq('user_id', ownerId)
 
       if (vErr) {
         if (!cancelled) {
@@ -136,8 +160,19 @@ export default function DashboardPage() {
         }
       })
 
+      // For videos with no usable thumbnail, fall back to a client-side
+      // first-frame capture from the source video.
+      const sources: Record<string, string> = {}
+      for (const v of videosData ?? []) {
+        const id = String(v.id)
+        if (cloudinaryThumbnail(v.file_url)) continue
+        const src = pickVideoSrc(v.file_url, v.cloudinary_public_id)
+        if (src) sources[id] = src
+      }
+
       if (!cancelled) {
         setVideos(mapped)
+        setCaptureSources(sources)
         setLoading(false)
       }
     }
@@ -148,6 +183,49 @@ export default function DashboardPage() {
     }
   }, [])
 
+  // Capture a first-frame thumbnail for videos whose `file_url` is a broken
+  // Cloudinary "fetch" delivery URL, by seeking a hidden <video> to time 0
+  // and drawing the frame to a <canvas>.
+  useEffect(() => {
+    const videoEl = captureVideoRef.current
+    const canvas = captureCanvasRef.current
+    const entries = Object.entries(captureSources)
+    if (!videoEl || !canvas || entries.length === 0) return
+
+    let cancelled = false
+
+    async function run() {
+      const ctx = canvas!.getContext('2d')
+      if (!ctx) return
+      canvas!.width = 320
+      canvas!.height = 180
+
+      for (const [id, src] of entries) {
+        if (cancelled) return
+        try {
+          videoEl!.crossOrigin = 'anonymous'
+          videoEl!.src = src
+          await new Promise<void>((resolve, reject) => {
+            videoEl!.onloadeddata = () => resolve()
+            videoEl!.onerror = () => reject(new Error('Failed to load source video for thumbnail'))
+          })
+          if (cancelled) return
+          ctx.drawImage(videoEl!, 0, 0, canvas!.width, canvas!.height)
+          const dataUrl = canvas!.toDataURL('image/jpeg', 0.7)
+          setCapturedThumbnails((prev) => ({ ...prev, [id]: dataUrl }))
+        } catch (err) {
+          console.error('[dashboard] thumbnail capture failed:', err)
+        }
+      }
+    }
+
+    run().catch((err) => console.error('[dashboard] thumbnail generation failed:', err))
+
+    return () => {
+      cancelled = true
+    }
+  }, [captureSources])
+
   const handleDelete = async (videoId: string) => {
     // Optimistic UI: drop the card immediately, restore on failure.
     const previous = videos
@@ -155,7 +233,8 @@ export default function DashboardPage() {
 
     const { data: userData } = await supabase.auth.getUser()
     const user = userData?.user
-    if (!user) {
+    const ownerId = user?.id ?? getGuestId()
+    if (!ownerId) {
       setVideos(previous)
       toast.error('You must be signed in to delete videos')
       return
@@ -177,7 +256,7 @@ export default function DashboardPage() {
       .from('videos')
       .delete()
       .eq('id', videoId)
-      .eq('user_id', user.id)
+      .eq('user_id', ownerId)
 
     if (vErr) {
       setVideos(previous)
@@ -204,6 +283,11 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-7xl">
+      {/* Hidden elements used to capture first-frame thumbnails for videos
+          whose `file_url` is a broken Cloudinary "fetch" delivery URL. */}
+      <video ref={captureVideoRef} muted playsInline className="hidden" />
+      <canvas ref={captureCanvasRef} className="hidden" />
+
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -302,7 +386,11 @@ export default function DashboardPage() {
             {filteredVideos.map((video) => (
               <StaggerItem key={video.id}>
                 <HoverLift>
-                  <VideoCard {...video} onDelete={handleDelete} />
+                  <VideoCard
+                    {...video}
+                    thumbnail={video.thumbnail || capturedThumbnails[video.id] || ''}
+                    onDelete={handleDelete}
+                  />
                 </HoverLift>
               </StaggerItem>
             ))}

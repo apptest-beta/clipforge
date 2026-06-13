@@ -11,6 +11,7 @@ import { rateLimit } from '@/lib/security/rate-limit'
 import { secureJson, secureError } from '@/lib/security/headers'
 import {
   isPositiveNumber,
+  isGuestId,
   hasOnlyKeys,
 } from '@/lib/security/validators'
 import { requireEnv } from '@/lib/security/env'
@@ -79,7 +80,7 @@ function thumbnailFor(publicId: string, startTime: number): string {
 }
 
 // Allowed top-level keys on the incoming JSON body. Anything else is rejected.
-const ALLOWED_KEYS = ['game', 'momentTypes', 'fileName', 'fileUrl', 'durationSec'] as const
+const ALLOWED_KEYS = ['game', 'momentTypes', 'fileName', 'fileUrl', 'durationSec', 'guestId'] as const
 
 // Rate limit: 10 analyze calls per minute per IP. Each call hits Gemini + Supabase,
 // so the limit is tighter than upload/export to protect API quotas and costs.
@@ -126,12 +127,13 @@ export async function POST(request: NextRequest) {
     return secureError('Unexpected fields in request body', 400)
   }
 
-  const { game, momentTypes, fileName, fileUrl, durationSec } = body as {
+  const { game, momentTypes, fileName, fileUrl, durationSec, guestId } = body as {
     game?: unknown
     momentTypes?: unknown
     fileName?: unknown
     fileUrl?: unknown
     durationSec?: unknown
+    guestId?: unknown
   }
 
   // Early check: fileUrl and game are required
@@ -162,6 +164,9 @@ export async function POST(request: NextRequest) {
   }
   if (momentTypes !== undefined && !Array.isArray(momentTypes)) {
     return secureError('Invalid momentTypes', 400)
+  }
+  if (guestId !== undefined && guestId !== null && !isGuestId(guestId)) {
+    return secureError('Invalid guestId', 400)
   }
 
   try {
@@ -195,7 +200,9 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient()
     const { data: userData } = await supabase.auth.getUser()
-    const userId = userData?.user?.id ?? null
+    // Guests have no Supabase session - fall back to their client-minted
+    // guest ID so the dashboard can find this video afterwards.
+    const userId = userData?.user?.id ?? (isGuestId(guestId) ? guestId : null)
 
     const { data: video, error: videoError } = await supabase
       .from('videos')

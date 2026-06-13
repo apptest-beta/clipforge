@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Inter, Space_Grotesk } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/sonner'
+import ShaderBackground from '@/components/ui/shader-background'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans', weight: ['400', '500', '600'] })
@@ -40,8 +41,9 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`bg-background ${inter.variable} ${spaceGrotesk.variable}`}>
+    <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`}>
       <body className="font-sans antialiased">
+        <ShaderBackground />
         {children}
         <Toaster />
         {process.env.NODE_ENV === 'production' && <Analytics />}

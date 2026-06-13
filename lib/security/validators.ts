@@ -8,6 +8,14 @@ export function isUuid(value: unknown): value is string {
   return typeof value === 'string' && UUID_RE.test(value)
 }
 
+const GUEST_ID_RE = new RegExp(`^guest_${UUID_RE.source.slice(1, -1)}$`, 'i')
+
+// Guest sessions don't have a Supabase user - the client mints a
+// `guest_<uuid>` ID (see lib/guest.ts) that we accept as a stand-in `user_id`.
+export function isGuestId(value: unknown): value is string {
+  return typeof value === 'string' && GUEST_ID_RE.test(value)
+}
+
 export function isPositiveNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0
 }
@@ -28,6 +36,18 @@ export function isCloudinaryUrl(value: unknown): value is string {
 export function isOwnCloudinaryUrl(value: unknown, cloudName: string): value is string {
   if (!isCloudinaryUrl(value)) return false
   return value.startsWith(`https://res.cloudinary.com/${cloudName}/`)
+}
+
+// Any plain http(s) URL - used to pick a directly-downloadable source URL
+// (e.g. preferring a raw Uploadthing URL over a broken Cloudinary fetch URL).
+export function isHttpUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  try {
+    const u = new URL(value)
+    return u.protocol === 'https:' || u.protocol === 'http:'
+  } catch {
+    return false
+  }
 }
 
 // File-size guard: 2 GB hard cap for uploads, matches the Vercel + Cloudinary practical ceiling.

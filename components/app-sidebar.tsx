@@ -92,8 +92,8 @@ export function AppSidebar() {
     <motion.aside
       initial={{ x: -20, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
-      style={{ background: '#0D0D0D', borderRight: '1px solid #1F1F1F' }}
-      className="fixed left-0 top-16 z-40 hidden h-[calc(100vh-4rem)] w-64 lg:block"
+      style={{ background: 'rgba(13,13,13,0.6)', borderRight: '1px solid #1F1F1F' }}
+      className="fixed left-0 top-16 z-40 hidden h-[calc(100vh-4rem)] w-64 backdrop-blur-xl lg:block"
     >
       <div className="flex h-full flex-col p-4">
         <motion.div whileHover={{ scale: 1.03 }} transition={{ type: 'spring', stiffness: 300, damping: 20 }}>
@@ -115,9 +115,9 @@ export function AppSidebar() {
                 style={
                   isActive
                     ? {
-                        borderLeft: '3px solid #C9A84C',
-                        background: 'rgba(201,168,76,0.08)',
-                        color: '#C9A84C',
+                        borderLeft: '3px solid #F97316',
+                        background: 'rgba(249,115,22,0.08)',
+                        color: '#F97316',
                         borderRadius: '0 6px 6px 0',
                       }
                     : { color: '#888888' }
@@ -132,7 +132,7 @@ export function AppSidebar() {
                   whileHover={{ x: 2 }}
                   transition={{ duration: 0.15 }}
                 >
-                  <item.icon className="h-4 w-4" style={isActive ? { color: '#C9A84C' } : {}} />
+                  <item.icon className="h-4 w-4" style={isActive ? { color: '#F97316' } : {}} />
                   {item.label}
                 </motion.span>
               </Link>

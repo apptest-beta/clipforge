@@ -6,6 +6,7 @@ import { type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { rateLimit } from '@/lib/security/rate-limit'
 import { secureJson, secureError } from '@/lib/security/headers'
+import { isHttpUrl } from '@/lib/security/validators'
 
 const CUTTER_URL = 'https://clipforge-cutter-production.up.railway.app'
 
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     const { data: video, error: videoError } = await supabase
       .from('videos')
-      .select('id, file_url')
+      .select('id, file_url, cloudinary_public_id')
       .eq('id', videoId)
       .maybeSingle()
 
@@ -64,8 +65,18 @@ export async function POST(request: NextRequest) {
       return secureError('Video not found', 400)
     }
 
+    // `file_url` is a Cloudinary "fetch" delivery URL wrapping the original
+    // Uploadthing URL. Cloudinary's fetch delivery isn't enabled for this
+    // account, so downloading it directly returns HTTP 401. `cloudinary_public_id`
+    // holds the raw, directly-downloadable Uploadthing URL - prefer that when
+    // it's a real URL, and fall back to `file_url` for older rows that don't
+    // have it.
+    const sourceUrl = isHttpUrl(video.cloudinary_public_id)
+      ? video.cloudinary_public_id
+      : video.file_url
+
     console.log('[cut] videoId:', videoId, 'start:', startTime, 'end:', endTime)
-    console.log('[cut] forwarding to cutter service:', video.file_url)
+    console.log('[cut] forwarding to cutter service:', sourceUrl)
 
     // Forward to Railway microservice with 60s AbortController timeout
     const controller = new AbortController()
@@ -76,7 +87,7 @@ export async function POST(request: NextRequest) {
       cutRes = await fetch(`${CUTTER_URL}/cut`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileUrl: video.file_url, startTime, endTime }),
+        body: JSON.stringify({ fileUrl: sourceUrl, startTime, endTime }),
         signal: controller.signal,
       })
     } catch (fetchErr: unknown) {

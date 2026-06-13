@@ -96,7 +96,7 @@ export function VideoCard({
       <Card
         className="group overflow-hidden"
         style={{
-          borderTop: `2px solid ${hovered ? '#C9A84C' : 'transparent'}`,
+          borderTop: `2px solid ${hovered ? '#F97316' : 'transparent'}`,
           boxShadow: hovered ? '0 8px 24px rgba(0,0,0,0.4)' : 'none',
           transition: 'border-color 200ms ease-out, box-shadow 200ms ease-out',
         }}

@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Mail, Lock, Loader2 } from 'lucide-react'
 import { Logo } from '@/components/logo'
 import { createClient } from '@/lib/supabase/client'
+import { getOrCreateGuestId } from '@/lib/guest'
 
 // Inner component holds the useSearchParams call. Next.js requires anything
 // that reads search params to live under a Suspense boundary, otherwise the
@@ -52,12 +53,13 @@ function LoginForm() {
     document.cookie = 'cf_guest=1; path=/; max-age=86400; SameSite=Lax'
     try {
       localStorage.setItem('cf_guest', '1')
+      getOrCreateGuestId()
     } catch {}
     router.push('/dashboard')
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
+    <div className="flex min-h-screen items-center justify-center px-4 py-12">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

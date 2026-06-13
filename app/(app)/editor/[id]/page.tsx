@@ -28,7 +28,7 @@ interface EditorClip {
   moment_type: string
   start_time: number | null
   end_time: number | null
-  score: number | null
+  confidence: number | null
   clip_url: string | null
   selected: boolean
 }
@@ -118,7 +118,7 @@ export default function EditorPage() {
 
       const { data: cData, error: cErr } = await supabase
         .from('clips')
-        .select('id, moment_type, start_time, end_time, score, thumbnail_url, clip_url')
+        .select('id, moment_type, start_time, end_time, confidence, thumbnail_url, clip_url')
         .eq('video_id', videoId)
         .order('start_time', { ascending: true })
 
@@ -136,7 +136,7 @@ export default function EditorPage() {
         moment_type: row.moment_type || 'moment',
         start_time: row.start_time ?? null,
         end_time: row.end_time ?? null,
-        score: row.score ?? null,
+        confidence: row.confidence ?? null,
         clip_url: row.clip_url || null,
         selected: Boolean(row.clip_url),
       }))
@@ -161,7 +161,11 @@ export default function EditorPage() {
     )
   }
 
-  const handleExportOne = (clipId: string) => {
+  // Cloudinary URLs are cross-origin, so the `download` attribute on a plain
+  // <a> is ignored and the browser just opens a new tab. Fetching the file
+  // as a blob and downloading via an object URL keeps everything on this
+  // page and saves the file to the user's downloads folder.
+  const handleExportOne = async (clipId: string) => {
     const clip = clips.find((c) => c.id === clipId)
     if (!clip) return
     if (!clip.clip_url) {
@@ -169,20 +173,27 @@ export default function EditorPage() {
       return
     }
     setExportingIds((prev) => new Set(prev).add(clipId))
-    toast.success(`Downloading ${configFor(clip.moment_type).label}...`)
-    const a = document.createElement('a')
-    a.href = `/api/export?clip_id=${encodeURIComponent(clipId)}`
-    a.rel = 'noopener'
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    setTimeout(() => {
+    try {
+      const res = await fetch(clip.clip_url)
+      if (!res.ok) throw new Error(`Download failed (${res.status})`)
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${clip.moment_type}_${clip.id}.mp4`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (e: any) {
+      toast.error('Download failed', { description: e?.message || 'Could not download clip' })
+    } finally {
       setExportingIds((prev) => {
         const next = new Set(prev)
         next.delete(clipId)
         return next
       })
-    }, 1500)
+    }
   }
 
   const handleExportSelected = () => {
@@ -319,9 +330,9 @@ export default function EditorPage() {
                           <span className="font-medium">
                             {formatSeconds(clip.start_time)} – {formatSeconds(clip.end_time)}
                           </span>
-                          {clip.score != null && (
+                          {clip.confidence != null && (
                             <span className="text-xs text-muted-foreground">
-                              {Math.round(clip.score)}%
+                              {Math.round(clip.confidence)}%
                             </span>
                           )}
                         </div>

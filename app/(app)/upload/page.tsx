@@ -5,6 +5,7 @@ import type { OurFileRouter } from '@/app/api/uploadthing/core'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { getOrCreateGuestId } from '@/lib/guest'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -53,10 +54,10 @@ const games = [
 const momentTypes = [
   { id: 'kills', label: 'Kills', icon: Crosshair, color: 'text-[#E85D5D]' },
   { id: 'deaths', label: 'Deaths', icon: Skull, color: 'text-[#888888]' },
-  { id: 'clutches', label: 'Clutches', icon: Trophy, color: 'text-[#C9A84C]' },
+  { id: 'clutches', label: 'Clutches', icon: Trophy, color: 'text-[#F97316]' },
   { id: 'funny', label: 'Funny Moments', icon: Laugh, color: 'text-[#60A5FA]' },
   { id: 'rage', label: 'Rage', icon: Angry, color: 'text-[#E8A838]' },
-  { id: 'jumpscares', label: 'Jump Scares', icon: Ghost, color: 'text-[#C9A84C]' },
+  { id: 'jumpscares', label: 'Jump Scares', icon: Ghost, color: 'text-[#F97316]' },
 ]
 
 const { uploadFiles } = genUploader<OurFileRouter>()
@@ -160,6 +161,7 @@ export default function UploadPage() {
         fileUrl,
         game: effectiveGame,
         momentTypes: selectedMoments,
+        guestId: getOrCreateGuestId(),
       }
       console.log('[upload] sending to /api/analyze:', analyzePayload)
 
@@ -237,8 +239,8 @@ export default function UploadPage() {
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
                   style={{
-                    borderColor: isDragging ? '#C9A84C' : '#2A2A2A',
-                    background: isDragging ? 'rgba(201,168,76,0.05)' : 'transparent',
+                    borderColor: isDragging ? '#F97316' : '#2A2A2A',
+                    background: isDragging ? 'rgba(249,115,22,0.05)' : 'transparent',
                   }}
                   className="relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-12 transition-all"
                 >

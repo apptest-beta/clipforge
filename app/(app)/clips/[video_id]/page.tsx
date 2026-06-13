@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FadeIn, StaggerContainer, StaggerItem, HoverLift } from '@/components/motion/motion-primitives'
@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { cleanFilename } from '@/lib/utils'
+import { getGuestId } from '@/lib/guest'
 
 type Clip = {
   id: string
@@ -40,6 +41,8 @@ type VideoInfo = {
   title: string | null
   file_name: string | null
   game: string | null
+  file_url: string | null
+  cloudinary_public_id: string | null
 }
 
 function formatTime(seconds: number) {
@@ -64,6 +67,20 @@ function confidenceColor(confidence: number) {
   return 'bg-orange-500/20 text-orange-500 border-orange-500/30'
 }
 
+// Pick a directly-playable source for the clip thumbnail capture below.
+// `file_url` is often a Cloudinary "fetch" delivery URL that 401s, while
+// `cloudinary_public_id` holds the raw Uploadthing URL (CORS-enabled and
+// directly downloadable) - prefer that, and fall back to `file_url` for
+// older rows that were uploaded straight to Cloudinary.
+function pickVideoSrc(video: VideoInfo | null): string | null {
+  if (!video) return null
+  if (video.cloudinary_public_id?.startsWith('http')) return video.cloudinary_public_id
+  if (video.file_url?.startsWith('http') && !video.file_url.includes('/video/fetch/')) {
+    return video.file_url
+  }
+  return null
+}
+
 export default function ClipsPage() {
   const params = useParams<{ video_id: string }>()
   const video_id = params?.video_id
@@ -74,12 +91,17 @@ export default function ClipsPage() {
   const [error, setError] = useState<string | null>(null)
   // Set of clip IDs currently being cut - each card tracks its own state.
   const [cuttingIds, setCuttingIds] = useState<Set<string>>(new Set())
+  // Clip thumbnails captured client-side from the source video (clip_id -> data URL).
+  const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
+  const captureVideoRef = useRef<HTMLVideoElement>(null)
+  const captureCanvasRef = useRef<HTMLCanvasElement>(null)
 
   const fetchClips = useCallback(async (): Promise<{ ok: boolean; message?: string }> => {
     if (!video_id) return { ok: false, message: 'Missing video_id' }
     const { data: userData } = await supabase.auth.getUser()
     const user = userData?.user
-    if (!user) {
+    const ownerId = user?.id ?? getGuestId()
+    if (!ownerId) {
       setClips([])
       return { ok: false, message: 'Not authenticated' }
     }
@@ -91,7 +113,7 @@ export default function ClipsPage() {
         'id, video_id, start_time, end_time, moment_type, confidence, clip_url, thumbnail_url, videos!inner(user_id)'
       )
       .eq('video_id', video_id)
-      .eq('videos.user_id', user.id)
+      .eq('videos.user_id', ownerId)
       .order('start_time', { ascending: true })
 
     if (qErr) return { ok: false, message: qErr.message }
@@ -103,15 +125,16 @@ export default function ClipsPage() {
     if (!video_id) return { ok: false, message: 'Missing video_id' }
     const { data: userData } = await supabase.auth.getUser()
     const user = userData?.user
-    if (!user) {
+    const ownerId = user?.id ?? getGuestId()
+    if (!ownerId) {
       setVideo(null)
       return { ok: false, message: 'Not authenticated' }
     }
     const { data, error: qErr } = await supabase
       .from('videos')
-      .select('id, title, file_name, game')
+      .select('id, title, file_name, game, file_url, cloudinary_public_id')
       .eq('id', video_id)
-      .eq('user_id', user.id)
+      .eq('user_id', ownerId)
       .single()
     if (qErr) return { ok: false, message: qErr.message }
     setVideo((data as VideoInfo) || null)
@@ -134,6 +157,90 @@ export default function ClipsPage() {
       cancelled = true
     }
   }, [video_id, fetchClips, fetchVideo])
+
+  // Generate per-clip thumbnails by seeking a hidden <video> to each clip's
+  // start time and capturing the frame to a <canvas>. `clip.thumbnail_url`
+  // from the analyze step isn't reliable (Cloudinary fetch delivery is
+  // unavailable for this account), so we build previews ourselves.
+  useEffect(() => {
+    const src = pickVideoSrc(video)
+    const videoEl = captureVideoRef.current
+    const canvas = captureCanvasRef.current
+    if (!src || !videoEl || !canvas || clips.length === 0) return
+
+    let cancelled = false
+
+    async function run() {
+      videoEl!.crossOrigin = 'anonymous'
+      videoEl!.src = src!
+      await new Promise<void>((resolve, reject) => {
+        videoEl!.onloadedmetadata = () => resolve()
+        videoEl!.onerror = () => reject(new Error('Failed to load source video for thumbnails'))
+      })
+
+      const ctx = canvas!.getContext('2d')
+      if (!ctx) return
+      canvas!.width = 320
+      canvas!.height = 180
+
+      for (const clip of clips) {
+        if (cancelled) return
+        const duration = videoEl!.duration
+        const time = Number.isFinite(duration)
+          ? Math.min(clip.start_time, Math.max(0, duration - 0.1))
+          : clip.start_time
+
+        await new Promise<void>((resolve) => {
+          const onSeeked = () => {
+            videoEl!.removeEventListener('seeked', onSeeked)
+            resolve()
+          }
+          videoEl!.addEventListener('seeked', onSeeked)
+          videoEl!.currentTime = time
+        })
+
+        if (cancelled) return
+        try {
+          ctx.drawImage(videoEl!, 0, 0, canvas!.width, canvas!.height)
+          const dataUrl = canvas!.toDataURL('image/jpeg', 0.7)
+          setThumbnails((prev) => ({ ...prev, [clip.id]: dataUrl }))
+        } catch (err) {
+          // CORS-tainted canvas or decode error - stop trying for this video.
+          console.error('[clips] thumbnail capture failed:', err)
+          return
+        }
+      }
+    }
+
+    run().catch((err) => console.error('[clips] thumbnail generation failed:', err))
+
+    return () => {
+      cancelled = true
+    }
+  }, [video, clips])
+
+  // Download a clip in-tab: Cloudinary URLs are cross-origin, so the `download`
+  // attribute on a plain <a> is ignored and the browser just opens a new tab.
+  // Fetching the file as a blob and downloading via an object URL keeps
+  // everything on this page and saves the file to the user's downloads folder.
+  async function handleDownload(clip: Clip) {
+    if (!clip.clip_url) return
+    try {
+      const res = await fetch(clip.clip_url)
+      if (!res.ok) throw new Error(`Download failed (${res.status})`)
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${clip.moment_type || 'clip'}_${clip.id}.mp4`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (e: any) {
+      toast.error('Download failed', { description: e?.message || 'Could not download clip' })
+    }
+  }
 
   async function handleCut(clipId: string) {
     if (!video_id || cuttingIds.has(clipId)) return
@@ -183,6 +290,10 @@ export default function ClipsPage() {
 
   return (
     <div className="mx-auto max-w-7xl">
+      {/* Hidden elements used to capture per-clip thumbnails from the source video */}
+      <video ref={captureVideoRef} muted playsInline className="hidden" />
+      <canvas ref={captureCanvasRef} className="hidden" />
+
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -280,6 +391,8 @@ export default function ClipsPage() {
                     duration={duration}
                     isCutting={isCutting}
                     onCut={handleCut}
+                    onDownload={handleDownload}
+                    thumbSrc={thumbnails[clip.id]}
                   />
                 </HoverLift>
               </StaggerItem>
@@ -297,24 +410,33 @@ function ClipCard({
   duration,
   isCutting,
   onCut,
+  onDownload,
+  thumbSrc,
 }: {
   clip: Clip
   index: number
   duration: number
   isCutting: boolean
   onCut: (id: string) => void
+  onDownload: (clip: Clip) => void
+  thumbSrc?: string
 }) {
+  const preview = thumbSrc || clip.thumbnail_url
   return (
     <Card className="overflow-hidden">
-        {clip.thumbnail_url && (
+        {preview ? (
           <div className="relative aspect-video w-full overflow-hidden bg-secondary">
             <div
               className="absolute inset-0 bg-cover bg-center transition-transform duration-300 hover:scale-105"
-              style={{ backgroundImage: `url(${clip.thumbnail_url})` }}
+              style={{ backgroundImage: `url(${preview})` }}
               role="img"
               aria-label={`${clip.moment_type || 'clip'} preview`}
             />
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+          </div>
+        ) : (
+          <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden bg-secondary">
+            <Film className="h-8 w-8 text-muted-foreground/40" />
           </div>
         )}
         <CardContent className="p-5">
@@ -358,19 +480,21 @@ function ClipCard({
           <div className="flex gap-2">
             <AnimatePresence mode="wait">
               {clip.clip_url ? (
-                <motion.a
+                <motion.div
                   key="download"
-                  href={clip.clip_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  download
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="flex-1 cursor-pointer inline-flex items-center justify-center rounded-md border border-green-500 bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white px-4 py-2 text-sm font-medium transition-colors"
+                  className="flex-1"
                 >
-                  <Download className="mr-2 h-4 w-4" />
-                  Download
-                </motion.a>
+                  <Button
+                    variant="outline"
+                    className="w-full cursor-pointer border-green-500 bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white"
+                    onClick={() => onDownload(clip)}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Download
+                  </Button>
+                </motion.div>
               ) : (
                 <Button
                   key="cut"
@@ -388,20 +512,6 @@ function ClipCard({
                 </Button>
               )}
             </AnimatePresence>
-            <Button
-              variant="secondary"
-              className="cursor-pointer"
-              disabled={!clip.clip_url}
-              asChild={!!clip.clip_url}
-            >
-              {clip.clip_url ? (
-                <a href={`/api/export?clip_id=${clip.id}`} target="_blank" rel="noopener noreferrer">
-                  Export
-                </a>
-              ) : (
-                <span>Export</span>
-              )}
-            </Button>
           </div>
         </CardContent>
       </Card>

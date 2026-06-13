@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { cleanFilename } from '@/lib/utils'
+import { getGuestId } from '@/lib/guest'
 
 interface ExportedClip {
   id: string
@@ -30,6 +31,7 @@ interface ExportedClip {
   thumbnail: string
   format: string
   exportedAt: string
+  clipUrl: string | null
 }
 
 function formatRelative(iso: string | null | undefined): string {
@@ -81,7 +83,8 @@ export default function ExportsPage() {
 
       const { data: userData } = await supabase.auth.getUser()
       const user = userData?.user
-      if (!user) {
+      const ownerId = user?.id ?? getGuestId()
+      if (!ownerId) {
         if (!cancelled) {
           setClips([])
           setLoading(false)
@@ -96,7 +99,7 @@ export default function ExportsPage() {
         .select(
           'id, moment_type, clip_url, thumbnail_url, created_at, videos!inner(file_name, game, user_id)'
         )
-        .eq('videos.user_id', user.id)
+        .eq('videos.user_id', ownerId)
         .not('clip_url', 'is', null)
         .order('created_at', { ascending: false })
 
@@ -120,6 +123,7 @@ export default function ExportsPage() {
           thumbnail: row.thumbnail_url || '',
           format: moment,
           exportedAt: formatRelative(row.created_at),
+          clipUrl: row.clip_url || null,
         }
       })
 
@@ -133,23 +137,33 @@ export default function ExportsPage() {
     }
   }, [])
 
-  const handleDownload = (clip: ExportedClip) => {
-    toast.success(`Downloading ${clip.title}...`)
-    const a = document.createElement('a')
-    a.href = `/api/export?clip_id=${encodeURIComponent(clip.id)}`
-    a.rel = 'noopener'
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
+  // Cloudinary URLs are cross-origin, so the `download` attribute on a plain
+  // <a> is ignored and the browser just opens a new tab. Fetching the file
+  // as a blob and downloading via an object URL keeps everything on this
+  // page and saves the file to the user's downloads folder.
+  const handleDownload = async (clip: ExportedClip) => {
+    if (!clip.clipUrl) {
+      toast.error('Download failed', { description: 'This clip has no file yet' })
+      return
+    }
+    try {
+      const res = await fetch(clip.clipUrl)
+      if (!res.ok) throw new Error(`Download failed (${res.status})`)
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${clip.format}_${clip.id}.mp4`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (e: any) {
+      toast.error('Download failed', { description: e?.message || 'Could not download clip' })
+    }
   }
 
   const handleDelete = async (id: string) => {
-    const { data: userData } = await supabase.auth.getUser()
-    const user = userData?.user
-    if (!user) {
-      toast.error('You must be signed in to delete clips')
-      return
-    }
     const { error: err } = await supabase.from('clips').delete().eq('id', id)
     if (err) {
       toast.error(`Failed to delete: ${err.message}`)

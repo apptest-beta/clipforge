@@ -4,7 +4,7 @@ import { PageTransition } from '@/components/motion/page-transition'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <Navbar variant="app" />
       <AppSidebar />
       <main className="lg:pl-64">

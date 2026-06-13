@@ -1,11 +1,21 @@
 'use client'
 
-import { motion, useReducedMotion, AnimatePresence } from 'framer-motion'
+import { motion, useReducedMotion, AnimatePresence, type Variants } from 'framer-motion'
 import React from 'react'
+
+// Returns false during SSR and the initial client render (matching the server
+// markup), then switches to the real reduced-motion preference after mount —
+// avoids hydration mismatches when the user has Reduced Motion enabled.
+function useMountedReducedMotion() {
+  const reduced = useReducedMotion()
+  const [mounted, setMounted] = React.useState(false)
+  React.useEffect(() => setMounted(true), [])
+  return mounted && !!reduced
+}
 
 // FadeIn — fades + slides up on mount
 export function FadeIn({ children, delay = 0, y = 12, className }: { children: React.ReactNode; delay?: number; y?: number; className?: string }) {
-  const reduced = useReducedMotion()
+  const reduced = useMountedReducedMotion()
   if (reduced) return <div className={className}>{children}</div>
   return (
     <motion.div
@@ -21,7 +31,7 @@ export function FadeIn({ children, delay = 0, y = 12, className }: { children: R
 
 // Reveal — fades + slides up on scroll into view
 export function Reveal({ children, delay = 0, y = 12, className }: { children: React.ReactNode; delay?: number; y?: number; className?: string }) {
-  const reduced = useReducedMotion()
+  const reduced = useMountedReducedMotion()
   if (reduced) return <div className={className}>{children}</div>
   return (
     <motion.div
@@ -37,17 +47,18 @@ export function Reveal({ children, delay = 0, y = 12, className }: { children: R
 }
 
 // StaggerContainer — parent for staggered children
-const staggerContainerVariants = {
+const staggerContainerVariants: Variants = {
   hidden: {},
   show: { transition: { staggerChildren: 0.06 } },
 }
 
-export function StaggerContainer({ children, className }: { children: React.ReactNode; className?: string }) {
-  const reduced = useReducedMotion()
-  if (reduced) return <div className={className}>{children}</div>
+export function StaggerContainer({ children, className, style }: { children: React.ReactNode; className?: string; style?: React.CSSProperties }) {
+  const reduced = useMountedReducedMotion()
+  if (reduced) return <div className={className} style={style}>{children}</div>
   return (
     <motion.div
       className={className}
+      style={style}
       variants={staggerContainerVariants}
       initial="hidden"
       whileInView="show"
@@ -58,13 +69,13 @@ export function StaggerContainer({ children, className }: { children: React.Reac
   )
 }
 
-const staggerItemVariants = {
+const staggerItemVariants: Variants = {
   hidden: { opacity: 0, y: 12 },
   show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
 }
 
 export function StaggerItem({ children, className }: { children: React.ReactNode; className?: string }) {
-  const reduced = useReducedMotion()
+  const reduced = useMountedReducedMotion()
   if (reduced) return <div className={className}>{children}</div>
   return (
     <motion.div className={className} variants={staggerItemVariants}>
@@ -75,7 +86,7 @@ export function StaggerItem({ children, className }: { children: React.ReactNode
 
 // HoverLift — lifts on hover, presses on tap
 export function HoverLift({ children, className }: { children: React.ReactNode; className?: string }) {
-  const reduced = useReducedMotion()
+  const reduced = useMountedReducedMotion()
   if (reduced) return <div className={className}>{children}</div>
   return (
     <motion.div
@@ -109,7 +120,7 @@ export function MotionButton({
   onMouseEnter?: React.MouseEventHandler<HTMLButtonElement>
   onMouseLeave?: React.MouseEventHandler<HTMLButtonElement>
 }) {
-  const reduced = useReducedMotion()
+  const reduced = useMountedReducedMotion()
   if (reduced) {
     return (
       <button className={className} onClick={onClick} disabled={disabled} type={type} style={style} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
