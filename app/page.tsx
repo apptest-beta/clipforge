@@ -1,7 +1,7 @@
 'use client'
 
 import { Scissors, Sparkles, Gamepad2, Trophy } from 'lucide-react'
-import { Reveal, StaggerContainer, StaggerItem, HoverLift } from '@/components/motion/motion-primitives'
+import { Reveal, StaggerContainer, StaggerItem } from '@/components/motion/motion-primitives'
 import Hero from '@/components/ui/animated-shader-hero'
 
 function handleGuest() {
@@ -51,25 +51,23 @@ const STEPS = [
 function FeatureCard({ feature }: { feature: typeof FEATURES[0] }) {
   const Icon = feature.icon
   return (
-    <HoverLift>
-      <div
-        className="hover-glow"
-        style={{
-          background: '#111111',
-          border: '1px solid #1F1F1F',
-          borderRadius: '8px',
-          padding: '24px',
-          cursor: 'default',
-          height: '100%',
-        }}
-      >
-        <Icon size={24} style={{ color: '#F97316', marginBottom: '16px' }} />
-        <h3 style={{ color: '#F2F2F2', fontWeight: 600, fontSize: '1rem', marginBottom: '8px', letterSpacing: '-0.02em' }}>
-          {feature.title}
-        </h3>
-        <p style={{ color: '#888888', fontSize: '0.9rem', lineHeight: 1.6 }}>{feature.desc}</p>
-      </div>
-    </HoverLift>
+    <div
+      className="hover-glow"
+      style={{
+        background: '#111111',
+        border: '1px solid #1F1F1F',
+        borderRadius: '8px',
+        padding: '24px',
+        cursor: 'default',
+        height: '100%',
+      }}
+    >
+      <Icon size={24} style={{ color: '#F97316', marginBottom: '16px' }} />
+      <h3 style={{ color: '#F2F2F2', fontWeight: 600, fontSize: '1rem', marginBottom: '8px', letterSpacing: '-0.02em' }}>
+        {feature.title}
+      </h3>
+      <p style={{ color: '#888888', fontSize: '0.9rem', lineHeight: 1.6 }}>{feature.desc}</p>
+    </div>
   )
 }
 
