@@ -44,6 +44,7 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`}>
       <body className="font-sans antialiased">
         <ShaderBackground />
+        <div className="fixed inset-0 -z-40 bg-black/40 pointer-events-none" />
         {children}
         <Toaster />
         {process.env.NODE_ENV === 'production' && <Analytics />}
