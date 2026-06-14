@@ -53,6 +53,7 @@ function FeatureCard({ feature }: { feature: typeof FEATURES[0] }) {
   return (
     <HoverLift>
       <div
+        className="hover-glow"
         style={{
           background: '#111111',
           border: '1px solid #1F1F1F',
@@ -116,7 +117,7 @@ export default function LandingPage() {
           <StaggerContainer style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0' } as React.CSSProperties}>
             {STEPS.map((step, i) => (
               <StaggerItem key={i}>
-                <div style={{ padding: '40px 32px', borderRight: i < 2 ? '1px solid #1F1F1F' : 'none', textAlign: 'left' }}>
+                <div className="hover-glow" style={{ padding: '40px 32px', borderTop: '1px solid transparent', borderBottom: '1px solid transparent', borderLeft: '1px solid transparent', borderRight: i < 2 ? '1px solid #1F1F1F' : '1px solid transparent', borderRadius: '8px', textAlign: 'left' }}>
                   <div style={{ fontSize: '0.62rem', letterSpacing: '0.14em', color: '#555555', textTransform: 'uppercase', marginBottom: '8px' }}>STEP</div>
                   <div className="font-display" style={{ fontSize: '2.5rem', fontWeight: 700, color: '#F97316', lineHeight: 1, marginBottom: '16px' }}>0{i + 1}</div>
                   <h3 className="font-display" style={{ fontWeight: 600, color: '#F2F2F2', marginBottom: '8px', fontSize: '1.05rem' }}>{step.title}</h3>
@@ -134,7 +135,7 @@ export default function LandingPage() {
           <div style={{ fontSize: '0.65rem', letterSpacing: '0.14em', color: '#555555', textTransform: 'uppercase', marginBottom: '20px' }}>WORKS WITH</div>
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
             {['Valorant', 'CS2', 'Fortnite', 'Apex Legends', 'Call of Duty', 'Minecraft', 'Rocket League', 'GTA V'].map(game => (
-              <span key={game} style={{ background: '#111111', border: '1px solid #2A2A2A', borderRadius: '4px', padding: '5px 14px', fontSize: '0.78rem', color: '#999999' }}>{game}</span>
+              <span key={game} className="hover-glow" style={{ background: '#111111', border: '1px solid #2A2A2A', borderRadius: '4px', padding: '5px 14px', fontSize: '0.78rem', color: '#999999', display: 'inline-block' }}>{game}</span>
             ))}
           </div>
         </section>

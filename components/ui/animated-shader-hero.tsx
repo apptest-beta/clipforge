@@ -105,7 +105,7 @@ const Hero: React.FC<HeroProps> = ({
         {/* Trust Badge */}
         {trustBadge && (
           <div className="mb-8 animate-fade-in-down">
-            <div className="flex items-center gap-2 px-6 py-3 bg-orange-500/10 backdrop-blur-md border border-orange-300/30 rounded-full text-sm">
+            <div className="hover-glow flex items-center gap-2 px-6 py-3 bg-orange-500/10 backdrop-blur-md border border-orange-300/30 rounded-full text-sm">
               {trustBadge.icons && (
                 <div className="flex">
                   {trustBadge.icons.map((icon, index) => (
