@@ -15,6 +15,7 @@
   --accent: #F97316;
   --accent-hover: #EA580C;
   --accent-subtle: rgba(249, 115, 22, 0.08);
+  --accent-foreground: #0A0A0A;
   --success: #4CAF7D;
   --warning: #E8A838;
   --error: #E85D5D;
@@ -112,6 +113,16 @@
 
 .font-display {
   font-family: var(--font-display, 'Space Grotesk', sans-serif);
+}
+
+.gradient-bg {
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+}
+
+.gradient-border {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.15), 0 12px 40px -16px rgba(249, 115, 22, 0.35);
+  transition: box-shadow 300ms ease, border-color 300ms ease;
 }
 
 @keyframes fade-up {
