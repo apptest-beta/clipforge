@@ -13,7 +13,6 @@ const CUTTER_URL = 'https://clipforge-cutter-production.up.railway.app'
 export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
-  console.log('[cut] route hit')
   try {
     // Rate limit: 20 cut requests per minute per IP
     const limit = await rateLimit(request, 'cut', 20, 60)
@@ -51,10 +50,17 @@ export async function POST(request: NextRequest) {
     // Look up the source video URL from Supabase
     const supabase = await createClient()
 
+    const { data: userData } = await supabase.auth.getUser()
+    const user = userData?.user
+    if (!user) {
+      return secureError('Unauthorized', 401)
+    }
+
     const { data: video, error: videoError } = await supabase
       .from('videos')
       .select('id, file_url, cloudinary_public_id')
       .eq('id', videoId)
+      .eq('user_id', user.id)
       .maybeSingle()
 
     if (videoError) {
@@ -74,9 +80,6 @@ export async function POST(request: NextRequest) {
     const sourceUrl = isHttpUrl(video.cloudinary_public_id)
       ? video.cloudinary_public_id
       : video.file_url
-
-    console.log('[cut] videoId:', videoId, 'start:', startTime, 'end:', endTime)
-    console.log('[cut] forwarding to cutter service:', sourceUrl)
 
     // Forward to Railway microservice with 60s AbortController timeout
     const controller = new AbortController()

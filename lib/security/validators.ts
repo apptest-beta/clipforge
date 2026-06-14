@@ -8,14 +8,6 @@ export function isUuid(value: unknown): value is string {
   return typeof value === 'string' && UUID_RE.test(value)
 }
 
-const GUEST_ID_RE = new RegExp(`^guest_${UUID_RE.source.slice(1, -1)}$`, 'i')
-
-// Guest sessions don't have a Supabase user - the client mints a
-// `guest_<uuid>` ID (see lib/guest.ts) that we accept as a stand-in `user_id`.
-export function isGuestId(value: unknown): value is string {
-  return typeof value === 'string' && GUEST_ID_RE.test(value)
-}
-
 export function isPositiveNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0
 }
@@ -36,6 +28,17 @@ export function isCloudinaryUrl(value: unknown): value is string {
 export function isOwnCloudinaryUrl(value: unknown, cloudName: string): value is string {
   if (!isCloudinaryUrl(value)) return false
   return value.startsWith(`https://res.cloudinary.com/${cloudName}/`)
+}
+
+// Validate a post-login redirect target (the `?next=` param). Must be an
+// internal, root-relative path - rejects absolute URLs and the
+// `//evil.com` / `/\evil.com` / `@evil.com` tricks that browsers resolve
+// to a different host, which would otherwise be an open redirect.
+export function isSafeRedirectPath(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  if (!value.startsWith('/')) return false
+  if (value.startsWith('//') || value.startsWith('/\\')) return false
+  return true
 }
 
 // Any plain http(s) URL - used to pick a directly-downloadable source URL

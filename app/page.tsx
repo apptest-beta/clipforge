@@ -3,10 +3,14 @@
 import { Scissors, Sparkles, Gamepad2, Trophy } from 'lucide-react'
 import { Reveal, StaggerContainer, StaggerItem } from '@/components/motion/motion-primitives'
 import Hero from '@/components/ui/animated-shader-hero'
+import { createClient } from '@/lib/supabase/client'
 
-function handleGuest() {
-  document.cookie = 'cf_guest=1; path=/; max-age=86400; SameSite=Lax'
-  try { localStorage.setItem('cf_guest', '1') } catch {}
+async function handleGuest() {
+  const supabase = createClient()
+  const { data } = await supabase.auth.getUser()
+  if (!data.user) {
+    await supabase.auth.signInAnonymously()
+  }
   window.location.href = '/dashboard'
 }
 

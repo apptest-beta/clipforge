@@ -18,7 +18,6 @@ import { Upload, Search, Grid3x3, List, Film } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { supabase } from '@/lib/supabase'
 import { cleanFilename } from '@/lib/utils'
-import { getGuestId } from '@/lib/guest'
 import { toast } from 'sonner'
 
 // Turn a Cloudinary video URL into a first-frame JPG thumbnail.
@@ -100,10 +99,7 @@ export default function DashboardPage() {
 
       const { data: userData } = await supabase.auth.getUser()
       const user = userData?.user
-      // Guests have no Supabase session - fall back to the client-minted
-      // guest ID that uploads were saved under (see lib/guest.ts).
-      const ownerId = user?.id ?? getGuestId()
-      if (!ownerId) {
+      if (!user) {
         if (!cancelled) {
           setVideos([])
           setLoading(false)
@@ -114,7 +110,7 @@ export default function DashboardPage() {
       const { data: videosData, error: vErr } = await supabase
         .from('videos')
         .select('id, title, file_name, file_url, cloudinary_public_id, game, status, created_at')
-        .eq('user_id', ownerId)
+        .eq('user_id', user.id)
 
       if (vErr) {
         if (!cancelled) {
@@ -233,8 +229,7 @@ export default function DashboardPage() {
 
     const { data: userData } = await supabase.auth.getUser()
     const user = userData?.user
-    const ownerId = user?.id ?? getGuestId()
-    if (!ownerId) {
+    if (!user) {
       setVideos(previous)
       toast.error('You must be signed in to delete videos')
       return
@@ -256,7 +251,7 @@ export default function DashboardPage() {
       .from('videos')
       .delete()
       .eq('id', videoId)
-      .eq('user_id', ownerId)
+      .eq('user_id', user.id)
 
     if (vErr) {
       setVideos(previous)

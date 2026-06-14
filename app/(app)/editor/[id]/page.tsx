@@ -102,10 +102,19 @@ export default function EditorPage() {
       setLoading(true)
       setError(null)
 
+      const { data: userData } = await supabase.auth.getUser()
+      const user = userData?.user
+      if (!user) {
+        setError('Not authenticated')
+        setLoading(false)
+        return
+      }
+
       const { data: vData, error: vErr } = await supabase
         .from('videos')
         .select('id, file_name, game')
         .eq('id', videoId)
+        .eq('user_id', user.id)
         .single()
 
       if (cancelled) return

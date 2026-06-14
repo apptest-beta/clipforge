@@ -42,10 +42,15 @@ export function Navbar({ variant = 'landing' }: NavbarProps) {
 
       if (!user) {
         if (cancelled) return
-        // No auth - they are a guest if they got past middleware via the cookie.
-        const guest = typeof document !== 'undefined' &&
-          document.cookie.split(';').some((c) => c.trim().startsWith('cf_guest=1'))
-        setIsGuest(guest)
+        setIsGuest(false)
+        setUsername('')
+        setEmail('')
+        return
+      }
+
+      if (user.is_anonymous) {
+        if (cancelled) return
+        setIsGuest(true)
         setUsername('')
         setEmail('')
         return
@@ -79,11 +84,6 @@ export function Navbar({ variant = 'landing' }: NavbarProps) {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
-    // Clear guest cookie too, just in case.
-    document.cookie = 'cf_guest=; path=/; max-age=0'
-    try {
-      localStorage.removeItem('cf_guest')
-    } catch {}
     router.push('/login')
     router.refresh()
   }

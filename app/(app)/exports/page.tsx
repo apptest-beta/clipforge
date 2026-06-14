@@ -23,7 +23,6 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { cleanFilename } from '@/lib/utils'
-import { getGuestId } from '@/lib/guest'
 
 interface ExportedClip {
   id: string
@@ -83,8 +82,7 @@ export default function ExportsPage() {
 
       const { data: userData } = await supabase.auth.getUser()
       const user = userData?.user
-      const ownerId = user?.id ?? getGuestId()
-      if (!ownerId) {
+      if (!user) {
         if (!cancelled) {
           setClips([])
           setLoading(false)
@@ -99,7 +97,7 @@ export default function ExportsPage() {
         .select(
           'id, moment_type, clip_url, thumbnail_url, created_at, videos!inner(file_name, game, user_id)'
         )
-        .eq('videos.user_id', ownerId)
+        .eq('videos.user_id', user.id)
         .not('clip_url', 'is', null)
         .order('created_at', { ascending: false })
 

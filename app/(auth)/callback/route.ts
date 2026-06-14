@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { ensureProfile, usernameFromEmail } from '@/lib/supabase/profiles'
+import { isSafeRedirectPath } from '@/lib/security/validators'
 
 // OAuth callback. Supabase redirects users here with a `?code=` after Google/Discord login.
 // We exchange the code for a session (which sets cookies), make sure a profiles row
@@ -12,7 +13,8 @@ import { ensureProfile, usernameFromEmail } from '@/lib/supabase/profiles'
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') || '/dashboard'
+  const rawNext = searchParams.get('next')
+  const next = isSafeRedirectPath(rawNext) ? rawNext : '/dashboard'
 
   if (!code) {
     return NextResponse.redirect(`${origin}/login?error=missing_code`)
@@ -38,8 +40,5 @@ export async function GET(request: NextRequest) {
     username: metaUsername,
   })
 
-  // Clear any lingering guest cookie now that the user is signed in.
-  const response = NextResponse.redirect(`${origin}${next}`)
-  response.cookies.set('cf_guest', '', { path: '/', maxAge: 0 })
-  return response
+  return NextResponse.redirect(`${origin}${next}`)
 }

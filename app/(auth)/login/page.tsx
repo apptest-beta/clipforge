@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Mail, Lock, Loader2 } from 'lucide-react'
 import { Logo } from '@/components/logo'
 import { createClient } from '@/lib/supabase/client'
-import { getOrCreateGuestId } from '@/lib/guest'
+import { isSafeRedirectPath } from '@/lib/security/validators'
 
 // Inner component holds the useSearchParams call. Next.js requires anything
 // that reads search params to live under a Suspense boundary, otherwise the
@@ -24,7 +24,8 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
-  const next = searchParams.get('next') || '/dashboard'
+  const rawNext = searchParams.get('next')
+  const next = isSafeRedirectPath(rawNext) ? rawNext : '/dashboard'
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -49,12 +50,11 @@ function LoginForm() {
     router.refresh()
   }
 
-  const handleGuest = () => {
-    document.cookie = 'cf_guest=1; path=/; max-age=86400; SameSite=Lax'
-    try {
-      localStorage.setItem('cf_guest', '1')
-      getOrCreateGuestId()
-    } catch {}
+  const handleGuest = async () => {
+    const { data } = await supabase.auth.getUser()
+    if (!data.user) {
+      await supabase.auth.signInAnonymously()
+    }
     router.push('/dashboard')
   }
 

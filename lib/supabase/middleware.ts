@@ -35,13 +35,10 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   if (!user && isProtected(pathname)) {
-    const guest = request.cookies.get('cf_guest')?.value === '1'
-    if (!guest) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/login'
-      url.searchParams.set('next', pathname)
-      return NextResponse.redirect(url)
-    }
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    url.searchParams.set('next', pathname)
+    return NextResponse.redirect(url)
   }
 
   return response

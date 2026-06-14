@@ -23,7 +23,6 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { cleanFilename } from '@/lib/utils'
-import { getGuestId } from '@/lib/guest'
 
 type Clip = {
   id: string
@@ -100,8 +99,7 @@ export default function ClipsPage() {
     if (!video_id) return { ok: false, message: 'Missing video_id' }
     const { data: userData } = await supabase.auth.getUser()
     const user = userData?.user
-    const ownerId = user?.id ?? getGuestId()
-    if (!ownerId) {
+    if (!user) {
       setClips([])
       return { ok: false, message: 'Not authenticated' }
     }
@@ -113,7 +111,7 @@ export default function ClipsPage() {
         'id, video_id, start_time, end_time, moment_type, confidence, clip_url, thumbnail_url, videos!inner(user_id)'
       )
       .eq('video_id', video_id)
-      .eq('videos.user_id', ownerId)
+      .eq('videos.user_id', user.id)
       .order('start_time', { ascending: true })
 
     if (qErr) return { ok: false, message: qErr.message }
@@ -125,8 +123,7 @@ export default function ClipsPage() {
     if (!video_id) return { ok: false, message: 'Missing video_id' }
     const { data: userData } = await supabase.auth.getUser()
     const user = userData?.user
-    const ownerId = user?.id ?? getGuestId()
-    if (!ownerId) {
+    if (!user) {
       setVideo(null)
       return { ok: false, message: 'Not authenticated' }
     }
@@ -134,7 +131,7 @@ export default function ClipsPage() {
       .from('videos')
       .select('id, title, file_name, game, file_url, cloudinary_public_id')
       .eq('id', video_id)
-      .eq('user_id', ownerId)
+      .eq('user_id', user.id)
       .single()
     if (qErr) return { ok: false, message: qErr.message }
     setVideo((data as VideoInfo) || null)

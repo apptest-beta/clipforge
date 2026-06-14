@@ -5,7 +5,6 @@ import type { OurFileRouter } from '@/app/api/uploadthing/core'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { getOrCreateGuestId } from '@/lib/guest'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -161,10 +160,7 @@ export default function UploadPage() {
         fileUrl,
         game: effectiveGame,
         momentTypes: selectedMoments,
-        guestId: getOrCreateGuestId(),
       }
-      console.log('[upload] sending to /api/analyze:', analyzePayload)
-
       // Fake progress tick: nudge from 50% toward 95% every 2s while analysis runs
       let fakePct = 50
       const ticker = setInterval(() => {
