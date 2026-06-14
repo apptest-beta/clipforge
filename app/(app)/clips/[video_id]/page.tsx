@@ -180,20 +180,45 @@ export default function ClipsPage() {
       canvas!.width = 320
       canvas!.height = 180
 
-      for (const clip of clips) {
+      for (let i = 0; i < clips.length; i++) {
+        const clip = clips[i]
         if (cancelled) return
         const duration = videoEl!.duration
-        const time = Number.isFinite(duration)
-          ? Math.min(clip.start_time, Math.max(0, duration - 0.1))
-          : clip.start_time
+        let time = clip.start_time
+        if (Number.isFinite(duration) && duration > 0) {
+          const maxTime = Math.max(0, duration - 0.1)
+          if (time > maxTime) {
+            // Out-of-range timestamp (e.g. analysis returned a time past the
+            // actual video length) - spread these across the video so each
+            // clip still gets a distinct frame instead of all clamping to
+            // the same end-of-video moment.
+            time = Math.min(maxTime, (maxTime * (i + 1)) / (clips.length + 1))
+          }
+        }
 
         await new Promise<void>((resolve) => {
-          const onSeeked = () => {
+          let done = false
+          const finish = () => {
+            if (done) return
+            done = true
             videoEl!.removeEventListener('seeked', onSeeked)
+            clearTimeout(timer)
             resolve()
           }
+          const onSeeked = () => finish()
+          // If currentTime doesn't actually change, `seeked` never fires -
+          // fall back to a timeout so the loop can't hang and strand the
+          // remaining clips on the duplicate `thumbnail_url`.
+          const timer = setTimeout(finish, 1000)
           videoEl!.addEventListener('seeked', onSeeked)
           videoEl!.currentTime = time
+        })
+
+        if (cancelled) return
+        // Give the browser a couple of frames to actually paint the seeked
+        // frame before we read it off the canvas.
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
         })
 
         if (cancelled) return
