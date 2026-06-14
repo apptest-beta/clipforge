@@ -180,10 +180,32 @@ export default function ClipsPage() {
       canvas!.width = 320
       canvas!.height = 180
 
+      // Chunked/streamed sources often report duration as 0 (or Infinity)
+      // right after `loadedmetadata` - wait briefly for the real duration
+      // via `durationchange`, otherwise every clip's clamped time collapses
+      // to 0 and they all capture the same blank first frame.
+      let duration = videoEl!.duration
+      if (!Number.isFinite(duration) || duration <= 0) {
+        duration = await new Promise<number>((resolve) => {
+          const onChange = () => {
+            const d = videoEl!.duration
+            if (Number.isFinite(d) && d > 0) {
+              videoEl!.removeEventListener('durationchange', onChange)
+              clearTimeout(timer)
+              resolve(d)
+            }
+          }
+          const timer = setTimeout(() => {
+            videoEl!.removeEventListener('durationchange', onChange)
+            resolve(videoEl!.duration)
+          }, 2000)
+          videoEl!.addEventListener('durationchange', onChange)
+        })
+      }
+
       for (let i = 0; i < clips.length; i++) {
         const clip = clips[i]
         if (cancelled) return
-        const duration = videoEl!.duration
         let time = clip.start_time
         if (Number.isFinite(duration) && duration > 0) {
           const maxTime = Math.max(0, duration - 0.1)
