@@ -334,6 +334,7 @@ export default function DashboardPage() {
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search videos..."
+                aria-label="Search videos"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9"
@@ -355,6 +356,8 @@ export default function DashboardPage() {
                   variant={view === 'grid' ? 'secondary' : 'ghost'}
                   size="icon"
                   className="h-8 w-8"
+                  aria-label="Grid view"
+                  aria-pressed={view === 'grid'}
                   onClick={() => setView('grid')}
                 >
                   <Grid3x3 className="h-4 w-4" />
@@ -363,6 +366,8 @@ export default function DashboardPage() {
                   variant={view === 'list' ? 'secondary' : 'ghost'}
                   size="icon"
                   className="h-8 w-8"
+                  aria-label="List view"
+                  aria-pressed={view === 'list'}
                   onClick={() => setView('list')}
                 >
                   <List className="h-4 w-4" />

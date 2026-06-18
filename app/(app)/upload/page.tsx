@@ -282,7 +282,7 @@ export default function UploadPage() {
                       <p className="text-sm text-muted-foreground">{formatFileSize(file.size)}</p>
                     </div>
                     {!isUploading && (
-                      <Button variant="ghost" size="icon" onClick={removeFile} className="shrink-0">
+                      <Button variant="ghost" size="icon" onClick={removeFile} className="shrink-0" aria-label="Remove file">
                         <X className="h-4 w-4" />
                       </Button>
                     )}

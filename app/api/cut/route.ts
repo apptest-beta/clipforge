@@ -8,7 +8,10 @@ import { rateLimit } from '@/lib/security/rate-limit'
 import { secureJson, secureError } from '@/lib/security/headers'
 import { isHttpUrl } from '@/lib/security/validators'
 
-const CUTTER_URL = 'https://clipforge-cutter-production.up.railway.app'
+// The cutter base URL is configurable via env (no trailing slash); falls back
+// to the production Railway service when unset so existing deploys are unaffected.
+const CUTTER_URL =
+  process.env.CUTTER_URL?.replace(/\/$/, '') || 'https://clipforge-cutter-production.up.railway.app'
 
 export const runtime = 'nodejs'
 

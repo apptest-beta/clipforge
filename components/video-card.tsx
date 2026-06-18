@@ -160,6 +160,7 @@ export function VideoCard({
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 shrink-0"
+                  aria-label="Video options"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <MoreVertical className="h-4 w-4" />

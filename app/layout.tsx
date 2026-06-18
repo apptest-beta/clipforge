@@ -8,10 +8,47 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans', weight: ['400', '500', '600'] })
 const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-display', weight: ['500', '600', '700'] })
 
+const siteUrl = 'https://clipforge-swart.vercel.app'
+
 export const metadata: Metadata = {
-  title: 'ClipForge - AI-Powered Clip Finder for Gaming',
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: 'ClipForge - AI-Powered Clip Finder for Gaming',
+    template: '%s | ClipForge',
+  },
   description: 'Turn 3-hour streams into viral clips in 5 minutes. AI finds your kills, clutches, and rage moments automatically.',
+  applicationName: 'ClipForge',
   generator: 'v0.app',
+  keywords: [
+    'gaming clips',
+    'clip finder',
+    'AI highlights',
+    'stream highlights',
+    'gameplay editor',
+    'twitch clips',
+    'kill montage',
+    'ClipForge',
+  ],
+  authors: [{ name: 'ClipForge' }],
+  creator: 'ClipForge',
+  alternates: {
+    canonical: '/',
+  },
+  openGraph: {
+    type: 'website',
+    siteName: 'ClipForge',
+    title: 'ClipForge - AI-Powered Clip Finder for Gaming',
+    description: 'Turn 3-hour streams into viral clips in 5 minutes. AI finds your kills, clutches, and rage moments automatically.',
+    url: siteUrl,
+    locale: 'en_US',
+    images: [{ url: '/apple-icon.png', width: 180, height: 180, alt: 'ClipForge' }],
+  },
+  twitter: {
+    card: 'summary',
+    title: 'ClipForge - AI-Powered Clip Finder for Gaming',
+    description: 'Turn 3-hour streams into viral clips in 5 minutes. AI finds your kills, clutches, and rage moments automatically.',
+    images: ['/apple-icon.png'],
+  },
   icons: {
     icon: [
       {
