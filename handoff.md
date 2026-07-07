@@ -1,42 +1,35 @@
 # Handoff
 
 ## Latest commit
-`f34e7b5` — "Apply orange shader theme app-wide and accent color swap" (on `main`, working tree clean)
+`14b912c` — "Bug fixes, UI polish, and new features across the app" (on `main`, deployed to production via Vercel Git integration)
 
 ## What changed in this session
 
-### 1. Global animated shader background
-- New [components/ui/shader-background.tsx](components/ui/shader-background.tsx): extracted the WebGL fire/smoke shader (from the landing-page Hero) into a standalone `ShaderBackground` component — a single `fixed inset-0 -z-50` canvas with its own animation loop.
-- Mounted once in [app/layout.tsx](app/layout.tsx) so it sits behind every page and persists across navigation (one WebGL context for the whole app, not recreated per route).
-- [components/ui/animated-shader-hero.tsx](components/ui/animated-shader-hero.tsx) (`Hero`, used on the landing page) was simplified to just the text/CTA overlay — its own duplicate canvas/WebGL code was removed since the background is now global.
+### Bug fixes
+- Editor page: `xl:grid-cols-[1fr,320px]` was invalid CSS (comma instead of underscore) — the Batch Export sidebar stacked below the grid instead of beside it. Fixed to `[1fr_320px]` and verified the computed style in-browser.
+- [shader-background.tsx](components/ui/shader-background.tsx): GL viewport was multiplied by the DPR scale twice (canvas dimensions already include it), distorting output on high-DPI screens; also added a WebGL2-unavailable guard so old GPUs don't crash the app.
+- [navbar.tsx](components/navbar.tsx) / [app-sidebar.tsx](components/app-sidebar.tsx): Supabase calls inside `onAuthStateChange` deferred via `setTimeout` (documented deadlock risk in supabase-js).
+- Dashboard: videos now ordered newest-first; delete verifies ownership before removing clip rows (previously could toast success without deleting anything).
+- [api/cut/route.ts](app/api/cut/route.ts): cutter 400s (e.g. clip range outside video) now pass through as 400 instead of being masked as 500.
+- [api/analyze/route.ts](app/api/analyze/route.ts): Gemini output sanitized before insert (numeric coercion, reversed/out-of-range rows dropped, confidence clamped); prompt now honors the user's selected moment types and includes the video duration.
+- [upload/page.tsx](app/(app)/upload/page.tsx): video duration measured client-side and sent as `durationSec` (was never sent → usage_minutes never tracked).
+- Editor prefers the stored `title` column like the other pages; video cards no longer render an empty duration badge.
+- `CUTTER_SECRET` documented in both `.env.example` files (cutter fails closed without it).
+- clipforge-cutter (separate repo, not deployed here): download stream error handling, redirect body draining, 30s idle timeout.
 
-### 2. Made page chrome transparent so the shader shows through
-Removed opaque `#0A0A0A` / `bg-background` page-level wrappers in:
-- [app/globals.css](app/globals.css) (`body` no longer has a solid background)
-- [app/(app)/layout.tsx](app/(app)/layout.tsx)
-- [app/(auth)/login/page.tsx](app/(auth)/login/page.tsx), [app/(auth)/signup/page.tsx](app/(auth)/signup/page.tsx)
-- [app/page.tsx](app/page.tsx) (all landing-page sections)
-- [app/not-found.tsx](app/not-found.tsx)
-
-Cards/panels/dialogs keep their existing solid `--card`/`--popover`/etc. backgrounds for readability — only the page-level "canvas" areas are transparent.
-
-- [components/app-sidebar.tsx](components/app-sidebar.tsx): sidebar is now semi-transparent (`rgba(13,13,13,0.6)`) with `backdrop-blur-xl`, matching the navbar's glass look.
-
-### 3. Accent color swap: gold → orange
-Replaced the old gold/amber accent (`#C9A84C` family) with orange (`#F97316`/`#EA580C`/`rgba(249,115,22,...)`) to match the shader's gradient, across:
-- [app/globals.css](app/globals.css) CSS variables: `--accent`, `--accent-hover`, `--accent-subtle`, `--primary`, `--ring`, `--chart-1`, `--sidebar-primary`, `--sidebar-ring`
-- [app/page.tsx](app/page.tsx), [components/app-sidebar.tsx](components/app-sidebar.tsx), [app/(app)/upload/page.tsx](app/(app)/upload/page.tsx), [app/not-found.tsx](app/not-found.tsx), [components/video-card.tsx](components/video-card.tsx), [app/(app)/error.tsx](app/(app)/error.tsx)
+### Features
+- Dashboard stats row: videos in library / highlights detected / clips cut & ready.
+- Clips workspace: per-clip preview player dialog (cut clips play their file; uncut clips play the source seeked to the detected range) + hover play overlay; "Cut all (n)" batch button (sequential, per-clip failure tolerant).
+- Sidebar now links to `/exports` (page was previously unreachable from the UI).
+- Exports: "Copy link" action in the row dropdown.
+- Settings: Plan & Usage card (plan badge, footage-analyzed minutes, member since).
 
 ## Verification done
-- `npx tsc --noEmit` clean
-- Browser-checked via preview: landing page (hero + features + how-it-works + footer), dashboard (empty state), settings, upload (dropzone), login, 404 — shader visible everywhere, all cards/text remain readable, no console errors.
-- Known preview-tool quirk: at large custom viewport sizes (e.g. 1440x900 via `preview_resize`), the shader canvas appeared confined to a small region in screenshots. DOM/GL measurements confirmed the canvas and `gl.viewport` are correctly sized to the full viewport — this looks like a headless preview rendering limitation, not a code bug. Default/preset viewport sizes render correctly.
-
-## Follow-up session: readability fix + cleanup
-- Added a global dim scrim in [app/layout.tsx](app/layout.tsx): `<div className="fixed inset-0 -z-40 bg-black/40 pointer-events-none" />` between `ShaderBackground` and `{children}`. The gut-check from "full intensity everywhere" found that page headings/text sitting directly on the shader (e.g. "Settings", "My Videos") had poor contrast against bright shader streaks. The 40% black scrim fixes contrast app-wide while the shader stays fully animated/visible; opaque cards/dialogs (`--card`/`--popover`) are unaffected since they already sit on top with solid backgrounds. Landing page hero still looks vibrant.
-- Removed `components/ui/container-scroll-animation.tsx` — confirmed unused (no imports anywhere), deleted as dead code.
-- Verified `/dashboard` renders cleanly with no console errors — the previously-flagged stale `useRef` issue (`task_9ace3958`) did not reproduce; treating as resolved/non-issue.
-- Re-verified `npx tsc --noEmit` clean, and checked landing, login, dashboard, settings with the new scrim — all readable, shader visible everywhere.
+- `npx tsc --noEmit` clean, 26/26 vitest tests pass, `pnpm build` clean (Next 16.2.6).
+- Browser-checked via preview as guest: landing, dashboard (stats hidden when empty, no errors), upload, exports, settings (Plan & Usage renders) — zero console errors.
+- Deployed: pushed to `main`, GitHub deployment for `14b912c` reached `success`; production domain https://clipforge-swart.vercel.app returns 200.
 
 ## Remaining open items
-- `styles/globals.css` (separate shadcn boilerplate theme file, not referenced by `components.json`) was left untouched — confirmed inactive/unused, low priority to remove.
+- **Analyze route never sends the video to Gemini** — text-only prompt, so detected moments are fabricated. Real fix needs Gemini Files API upload, which doesn't fit Vercel serverless limits; likely belongs in the Railway cutter service. Architecture decision pending.
+- Vercel CLI token on this machine is expired (`vercel login` needed for CLI deploys); Git-integration deploys work fine.
+- `styles/globals.css` (unused shadcn boilerplate) still present, low priority.
