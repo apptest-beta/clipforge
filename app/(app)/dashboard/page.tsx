@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Upload, Search, Grid3x3, List, Film } from 'lucide-react'
+import { Upload, Search, Grid3x3, List, Film, Sparkles, Scissors } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { supabase } from '@/lib/supabase'
 import { cleanFilename } from '@/lib/utils'
@@ -45,6 +45,28 @@ function pickVideoSrc(file_url: string | null, cloudinary_public_id: string | nu
 function normalizeStatus(status: string | null | undefined): VideoCardProps['status'] {
   if (status === 'processing' || status === 'rendering') return status
   return 'ready'
+}
+
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof Film
+  label: string
+  value: number
+}) {
+  return (
+    <div className="flex items-center gap-4 rounded-xl border border-border bg-card p-4">
+      <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-2.5">
+        <Icon className="h-5 w-5 text-[var(--accent)]" />
+      </div>
+      <div>
+        <p className="text-2xl font-bold leading-tight">{value}</p>
+        <p className="text-xs text-muted-foreground">{label}</p>
+      </div>
+    </div>
+  )
 }
 
 function DashboardSkeleton() {
@@ -87,6 +109,8 @@ export default function DashboardPage() {
   const [captureSources, setCaptureSources] = useState<Record<string, string>>({})
   // Captured first-frame thumbnails (video id -> data URL).
   const [capturedThumbnails, setCapturedThumbnails] = useState<Record<string, string>>({})
+  // Library-wide totals shown in the stats row above the grid.
+  const [stats, setStats] = useState({ clips: 0, cut: 0 })
   const captureVideoRef = useRef<HTMLVideoElement>(null)
   const captureCanvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -111,6 +135,7 @@ export default function DashboardPage() {
         .from('videos')
         .select('id, title, file_name, file_url, cloudinary_public_id, game, status, created_at')
         .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
 
       if (vErr) {
         if (!cancelled) {
@@ -122,7 +147,7 @@ export default function DashboardPage() {
 
       const videoIds = (videosData ?? []).map((v: any) => v.id)
       const { data: clipsData, error: cErr } = videoIds.length
-        ? await supabase.from('clips').select('video_id').in('video_id', videoIds)
+        ? await supabase.from('clips').select('video_id, clip_url').in('video_id', videoIds)
         : { data: [], error: null }
 
       if (cErr) {
@@ -134,9 +159,12 @@ export default function DashboardPage() {
       }
 
       const counts = new Map<string, number>()
+      let cutCount = 0
       for (const c of clipsData ?? []) {
-        const vid = String((c as { video_id: string | number }).video_id)
+        const row = c as { video_id: string | number; clip_url: string | null }
+        const vid = String(row.video_id)
         counts.set(vid, (counts.get(vid) ?? 0) + 1)
+        if (row.clip_url) cutCount++
       }
 
       const mapped: VideoCardProps[] = (videosData ?? []).map((v: any) => {
@@ -168,6 +196,7 @@ export default function DashboardPage() {
 
       if (!cancelled) {
         setVideos(mapped)
+        setStats({ clips: (clipsData ?? []).length, cut: cutCount })
         setCaptureSources(sources)
         setLoading(false)
       }
@@ -232,6 +261,22 @@ export default function DashboardPage() {
     if (!user) {
       setVideos(previous)
       toast.error('You must be signed in to delete videos')
+      return
+    }
+
+    // Confirm the video exists and belongs to this user before touching any
+    // rows — otherwise the clip deletion below could run (and "succeed" with
+    // zero rows) and we'd report success for a delete that never happened.
+    const { data: owned } = await supabase
+      .from('videos')
+      .select('id')
+      .eq('id', videoId)
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (!owned) {
+      setVideos(previous)
+      toast.error('Video not found')
       return
     }
 
@@ -324,6 +369,17 @@ export default function DashboardPage() {
         </FadeIn>
       ) : (
         <>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="mb-6 grid gap-4 sm:grid-cols-3"
+          >
+            <StatCard icon={Film} label="Videos in library" value={videos.length} />
+            <StatCard icon={Sparkles} label="Highlights detected" value={stats.clips} />
+            <StatCard icon={Scissors} label="Clips cut & ready" value={stats.cut} />
+          </motion.div>
+
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}

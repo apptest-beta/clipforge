@@ -174,7 +174,22 @@ export async function POST(request: NextRequest) {
       secure: true,
     })
 
-    const prompt = `You are an expert gaming clip detector. Analyze this gameplay video from ${game}. Find exactly 5 of the most exciting, funny, or impressive moments. Look for: kills, clutch plays, funny accidents, rage moments, epic fails, unexpected events. For each moment give a start_time and end_time that captures the full context (minimum 8 seconds, maximum 30 seconds). Return only valid JSON: { "moments": [{ "start_time": 10, "end_time": 28, "moment_type": "kill", "confidence": 87, "description": "Clean headshot from across the map" }] }`
+    // Honor the user's selected moment types; fall back to the full list.
+    const requestedMoments = Array.isArray(momentTypes)
+      ? momentTypes.filter(
+          (m): m is string => typeof m === 'string' && m.length > 0 && m.length <= 32
+        )
+      : []
+    const lookFor =
+      requestedMoments.length > 0
+        ? requestedMoments.join(', ')
+        : 'kills, clutch plays, funny accidents, rage moments, epic fails, unexpected events'
+    const durationHint =
+      typeof durationSec === 'number' && durationSec > 0
+        ? ` The video is ${Math.round(durationSec)} seconds long - every start_time and end_time must fall within that range.`
+        : ''
+
+    const prompt = `You are an expert gaming clip detector. Analyze this gameplay video from ${game}.${durationHint} Find exactly 5 of the most exciting, funny, or impressive moments. Look for: ${lookFor}. For each moment give a start_time and end_time that captures the full context (minimum 8 seconds, maximum 30 seconds). Return only valid JSON: { "moments": [{ "start_time": 10, "end_time": 28, "moment_type": "kill", "confidence": 87, "description": "Clean headshot from across the map" }] }`
 
     let text: string
     try {
@@ -223,18 +238,43 @@ export async function POST(request: NextRequest) {
     }
 
     if (video && parsed?.moments && Array.isArray(parsed.moments)) {
-      const rows = parsed.moments.map((m: any) => ({
-        video_id: video.id,
-        start_time: m.start_time,
-        end_time: m.end_time,
-        moment_type: m.moment_type,
-        confidence: m.confidence,
-        thumbnail_url: thumbnailFor(cloudinaryPublicId, Number(m.start_time) || 0),
-      }))
-      const { error: insertErr } = await supabase.from('clips').insert(rows)
-      if (insertErr) {
-        // Don't fail the request - the video row already saved.
-        console.error('[analyze] clips insert failed:', insertErr)
+      // Sanitize the model output before it touches the database: coerce the
+      // timestamps to numbers, drop rows with invalid/reversed ranges, clamp
+      // to the known video duration, and bound confidence to 0-100.
+      const maxEnd =
+        typeof durationSec === 'number' && durationSec > 0 ? durationSec : Infinity
+      const rows = parsed.moments
+        .map((m: any) => ({
+          start: Number(m?.start_time),
+          end: Number(m?.end_time),
+          moment_type:
+            typeof m?.moment_type === 'string' && m.moment_type.trim()
+              ? m.moment_type.trim().slice(0, 64)
+              : 'moment',
+          confidence: Math.max(0, Math.min(100, Math.round(Number(m?.confidence)) || 0)),
+        }))
+        .filter(
+          (m: { start: number; end: number }) =>
+            Number.isFinite(m.start) &&
+            Number.isFinite(m.end) &&
+            m.start >= 0 &&
+            m.end > m.start &&
+            m.start < maxEnd
+        )
+        .map((m: { start: number; end: number; moment_type: string; confidence: number }) => ({
+          video_id: video.id,
+          start_time: m.start,
+          end_time: Math.min(m.end, maxEnd),
+          moment_type: m.moment_type,
+          confidence: m.confidence,
+          thumbnail_url: thumbnailFor(cloudinaryPublicId, m.start),
+        }))
+      if (rows.length > 0) {
+        const { error: insertErr } = await supabase.from('clips').insert(rows)
+        if (insertErr) {
+          // Don't fail the request - the video row already saved.
+          console.error('[analyze] clips insert failed:', insertErr)
+        }
       }
     }
 

@@ -7,12 +7,13 @@ import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
-import { Upload, LayoutDashboard, Settings, Plus } from 'lucide-react'
+import { Upload, LayoutDashboard, Settings, Plus, Download } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/upload', label: 'Upload', icon: Upload },
+  { href: '/exports', label: 'Exports', icon: Download },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
@@ -80,7 +81,9 @@ export function AppSidebar() {
 
     loadRecent()
     const { data: sub } = supabase.auth.onAuthStateChange(() => {
-      loadRecent()
+      // Defer: calling Supabase functions synchronously inside the
+      // onAuthStateChange callback can deadlock the auth client's lock.
+      setTimeout(() => loadRecent(), 0)
     })
     return () => {
       cancelled = true

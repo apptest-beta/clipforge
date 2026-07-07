@@ -6,12 +6,15 @@ import { type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { rateLimit } from '@/lib/security/rate-limit'
 import { secureJson, secureError } from '@/lib/security/headers'
-import { isHttpUrl } from '@/lib/security/validators'
+import { isHttpUrl, isUuid } from '@/lib/security/validators'
 
 // The cutter base URL is configurable via env (no trailing slash); falls back
 // to the production Railway service when unset so existing deploys are unaffected.
 const CUTTER_URL =
   process.env.CUTTER_URL?.replace(/\/$/, '') || 'https://clipforge-cutter-production.up.railway.app'
+
+// Shared secret the cutter microservice requires on every /cut call.
+const CUTTER_SECRET = process.env.CUTTER_SECRET
 
 export const runtime = 'nodejs'
 
@@ -37,7 +40,8 @@ export async function POST(request: NextRequest) {
       return secureError('Invalid request body', 400)
     }
 
-    const { videoId, startTime, endTime } = body as {
+    const { clipId, videoId, startTime, endTime } = body as {
+      clipId?: unknown
       videoId?: unknown
       startTime?: unknown
       endTime?: unknown
@@ -45,6 +49,9 @@ export async function POST(request: NextRequest) {
 
     if (typeof videoId !== 'string' || videoId.length === 0) {
       return secureError('videoId is required', 400)
+    }
+    if (!isUuid(clipId)) {
+      return secureError('clipId must be a valid UUID', 400)
     }
     if (typeof startTime !== 'number' || typeof endTime !== 'number') {
       return secureError('startTime and endTime must be numbers', 400)
@@ -92,7 +99,10 @@ export async function POST(request: NextRequest) {
     try {
       cutRes = await fetch(`${CUTTER_URL}/cut`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(CUTTER_SECRET ? { 'x-cutter-secret': CUTTER_SECRET } : {}),
+        },
         body: JSON.stringify({ fileUrl: sourceUrl, startTime, endTime }),
         signal: controller.signal,
       })
@@ -121,7 +131,10 @@ export async function POST(request: NextRequest) {
         (cutJson?.error as string) ||
         (cutJson?.message as string) ||
         `Cut service failed (${cutRes.status})`
-      return secureError(errMsg, 500)
+      // A 400 from the cutter means the request itself was bad (e.g. clip
+      // range outside the video) — surface that as a client error rather
+      // than masking it as a server failure.
+      return secureError(errMsg, cutRes.status === 400 ? 400 : 500)
     }
 
     const clipUrl: string = cutJson.clip_url as string
@@ -129,14 +142,14 @@ export async function POST(request: NextRequest) {
       return secureError('Cut service returned no clip_url', 500)
     }
 
-    // Update the clips row with the new clip_url — filter by all three fields
-    // to avoid updating every clip for this video
+    // Update the specific clips row by its primary key. Keying on the clip id
+    // (scoped to this video) avoids stamping the URL onto sibling clips that
+    // happen to share the same start/end time.
     const { error: updateError } = await supabase
       .from('clips')
       .update({ clip_url: clipUrl })
+      .eq('id', clipId)
       .eq('video_id', videoId)
-      .eq('start_time', startTime)
-      .eq('end_time', endTime)
 
     if (updateError) {
       console.error('[cut] failed to update clip_url:', updateError)

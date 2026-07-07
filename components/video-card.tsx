@@ -128,10 +128,12 @@ export function VideoCard({
             <Badge variant="outline" className="border-white/20 bg-black/50 text-white backdrop-blur-sm">
               {game}
             </Badge>
-            <Badge variant="outline" className="border-white/20 bg-black/50 text-white backdrop-blur-sm">
-              <Clock className="mr-1 h-3 w-3" />
-              {duration}
-            </Badge>
+            {duration && (
+              <Badge variant="outline" className="border-white/20 bg-black/50 text-white backdrop-blur-sm">
+                <Clock className="mr-1 h-3 w-3" />
+                {duration}
+              </Badge>
+            )}
           </div>
         </div>
 

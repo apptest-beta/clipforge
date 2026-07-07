@@ -22,9 +22,17 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { Mail, User, Loader2, LogOut, Trash2 } from 'lucide-react'
+import { Mail, User, Loader2, LogOut, Trash2, Gem, Clock, CalendarDays } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase/client'
 import { ensureProfile, usernameFromEmail, type Profile } from '@/lib/supabase/profiles'
+
+function formatMemberSince(iso: string | undefined): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+}
 
 export default function SettingsPage() {
   const supabase = createClient()
@@ -202,6 +210,49 @@ export default function SettingsPage() {
             </Button>
           </CardContent>
         </Card>
+
+        {profile && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Plan &amp; Usage</CardTitle>
+              <CardDescription>Your current plan and analysis usage</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="flex items-center gap-3 rounded-lg border border-border bg-[var(--surface)] p-3">
+                  <Gem className="h-4 w-4 shrink-0 text-[var(--accent)]" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">Plan</p>
+                    <Badge
+                      variant="outline"
+                      className="mt-0.5 border-[var(--accent)]/40 bg-[var(--accent)]/10 capitalize text-[var(--accent)]"
+                    >
+                      {profile.plan || 'free'}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 rounded-lg border border-border bg-[var(--surface)] p-3">
+                  <Clock className="h-4 w-4 shrink-0 text-[var(--accent)]" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">Footage analyzed</p>
+                    <p className="mt-0.5 truncate text-sm font-medium">
+                      {profile.usage_minutes ?? 0} min
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 rounded-lg border border-border bg-[var(--surface)] p-3">
+                  <CalendarDays className="h-4 w-4 shrink-0 text-[var(--accent)]" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">Member since</p>
+                    <p className="mt-0.5 truncate text-sm font-medium">
+                      {formatMemberSince(profile.created_at)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>

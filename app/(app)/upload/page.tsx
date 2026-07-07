@@ -61,6 +61,30 @@ const momentTypes = [
 
 const { uploadFiles } = genUploader<OurFileRouter>()
 
+// Read the video's duration (seconds) from its metadata without uploading it.
+// Resolves null if the browser can't decode the file - duration is optional
+// downstream, so analysis still proceeds without it.
+function readVideoDuration(file: File): Promise<number | null> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file)
+    const el = document.createElement('video')
+    el.preload = 'metadata'
+    el.onloadedmetadata = () => {
+      URL.revokeObjectURL(url)
+      const d = el.duration
+      resolve(Number.isFinite(d) && d > 0 ? d : null)
+    }
+    el.onerror = () => {
+      URL.revokeObjectURL(url)
+      resolve(null)
+    }
+    el.src = url
+  })
+}
+
+// /api/analyze rejects durations over 2 hours - omit rather than fail.
+const MAX_DURATION_SEC = 7200
+
 export default function UploadPage() {
   const router = useRouter()
   const [isDragging, setIsDragging] = useState(false)
@@ -155,11 +179,15 @@ export default function UploadPage() {
       setStatusLabel('Analyzing with AI...')
 
       const effectiveGame = game || 'other'
+      const durationSec = await readVideoDuration(file)
       const analyzePayload = {
         fileName: file.name,
         fileUrl,
         game: effectiveGame,
         momentTypes: selectedMoments,
+        ...(durationSec !== null && durationSec <= MAX_DURATION_SEC
+          ? { durationSec }
+          : {}),
       }
       // Fake progress tick: nudge from 50% toward 95% every 2s while analysis runs
       let fakePct = 50

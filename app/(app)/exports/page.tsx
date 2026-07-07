@@ -20,6 +20,7 @@ import {
   Play,
   Film,
   CheckCircle2,
+  Link2,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { cleanFilename } from '@/lib/utils'
@@ -161,6 +162,21 @@ export default function ExportsPage() {
     }
   }
 
+  // Copy the clip's direct Cloudinary URL - handy for pasting into Discord
+  // or a browser without downloading the file first.
+  const handleCopyLink = async (clip: ExportedClip) => {
+    if (!clip.clipUrl) {
+      toast.error('This clip has no file yet')
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(clip.clipUrl)
+      toast.success('Link copied to clipboard')
+    } catch {
+      toast.error('Could not copy link')
+    }
+  }
+
   const handleDelete = async (id: string) => {
     const { error: err } = await supabase.from('clips').delete().eq('id', id)
     if (err) {
@@ -269,6 +285,10 @@ export default function ExportsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleCopyLink(clip)}>
+                              <Link2 className="mr-2 h-4 w-4" />
+                              Copy link
+                            </DropdownMenuItem>
                             <DropdownMenuItem
                               className="text-destructive"
                               onClick={() => handleDelete(clip.id)}

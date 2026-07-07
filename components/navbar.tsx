@@ -73,7 +73,9 @@ export function Navbar({ variant = 'landing' }: NavbarProps) {
     load()
 
     const { data: sub } = supabase.auth.onAuthStateChange(() => {
-      load()
+      // Defer: calling Supabase functions synchronously inside the
+      // onAuthStateChange callback can deadlock the auth client's lock.
+      setTimeout(() => load(), 0)
     })
 
     return () => {

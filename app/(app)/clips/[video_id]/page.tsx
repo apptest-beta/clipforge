@@ -20,7 +20,14 @@ import {
   Clock,
   AlertCircle,
   Gamepad2,
+  Play,
 } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { supabase } from '@/lib/supabase'
 import { cleanFilename } from '@/lib/utils'
 
@@ -90,6 +97,10 @@ export default function ClipsPage() {
   const [error, setError] = useState<string | null>(null)
   // Set of clip IDs currently being cut - each card tracks its own state.
   const [cuttingIds, setCuttingIds] = useState<Set<string>>(new Set())
+  // True while the "Cut all" batch runs.
+  const [cuttingAll, setCuttingAll] = useState(false)
+  // Clip currently open in the preview player dialog.
+  const [previewClip, setPreviewClip] = useState<Clip | null>(null)
   // Clip thumbnails captured client-side from the source video (clip_id -> data URL).
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
   const captureVideoRef = useRef<HTMLVideoElement>(null)
@@ -286,24 +297,21 @@ export default function ClipsPage() {
     }
   }
 
-  async function handleCut(clipId: string) {
-    if (!video_id || cuttingIds.has(clipId)) return
-
-    const clip = clips.find((c) => c.id === clipId)
-    if (!clip) return
-
+  // Core cut call for a single clip. Returns true on success; on failure it
+  // records the error (banner + toast) and returns false so batch callers can
+  // keep going.
+  async function cutOne(clip: Clip): Promise<boolean> {
     setCuttingIds((prev) => {
       const next = new Set(prev)
-      next.add(clipId)
+      next.add(clip.id)
       return next
     })
-    setError(null)
-
     try {
       const res = await fetch('/api/cut', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          clipId: clip.id,
           videoId: clip.video_id,
           startTime: clip.start_time,
           endTime: clip.end_time,
@@ -313,18 +321,55 @@ export default function ClipsPage() {
       if (!res.ok) {
         throw new Error(json?.error || `Cut failed (${res.status})`)
       }
-
-      await fetchClips()
-      toast.success('Clip ready', { description: 'Your clip has been cut successfully' })
+      return true
     } catch (e: any) {
       const msg = e?.message || 'Cut failed'
       setError(msg)
       toast.error('Cut failed', { description: msg })
+      return false
     } finally {
       setCuttingIds((prev) => {
         const next = new Set(prev)
-        next.delete(clipId)
+        next.delete(clip.id)
         return next
+      })
+    }
+  }
+
+  async function handleCut(clipId: string) {
+    if (!video_id || cuttingIds.has(clipId)) return
+    const clip = clips.find((c) => c.id === clipId)
+    if (!clip) return
+
+    setError(null)
+    const ok = await cutOne(clip)
+    if (ok) {
+      await fetchClips()
+      toast.success('Clip ready', { description: 'Your clip has been cut successfully' })
+    }
+  }
+
+  // Cut every not-yet-cut clip, one at a time so the cutter service isn't
+  // hit with parallel ffmpeg jobs.
+  async function handleCutAll() {
+    if (cuttingAll) return
+    const uncut = clips.filter((c) => !c.clip_url && !cuttingIds.has(c.id))
+    if (uncut.length === 0) return
+
+    setCuttingAll(true)
+    setError(null)
+    let done = 0
+    for (const clip of uncut) {
+      const ok = await cutOne(clip)
+      if (ok) done++
+    }
+    await fetchClips()
+    setCuttingAll(false)
+    if (done === uncut.length) {
+      toast.success('All clips cut', { description: `${done} clip${done === 1 ? '' : 's'} ready to download` })
+    } else if (done > 0) {
+      toast.warning(`${done} of ${uncut.length} clips cut`, {
+        description: 'Some clips failed - you can retry them individually.',
       })
     }
   }
@@ -349,7 +394,7 @@ export default function ClipsPage() {
               <ArrowLeft className="h-5 w-5" />
             </Link>
           </Button>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             {loading ? (
               <>
                 <Skeleton className="h-8 w-64" />
@@ -380,6 +425,20 @@ export default function ClipsPage() {
             )}
           </div>
         </div>
+        {!loading && cuttableCount > 0 && (
+          <Button
+            onClick={handleCutAll}
+            disabled={cuttingAll || cuttingIds.size > 0}
+            className="shrink-0 cursor-pointer border border-[var(--accent)] bg-[var(--surface)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[#0A0A0A]"
+          >
+            {cuttingAll ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Scissors className="mr-2 h-4 w-4" />
+            )}
+            {cuttingAll ? 'Cutting...' : `Cut all (${cuttableCount})`}
+          </Button>
+        )}
       </motion.div>
 
       {error && (
@@ -415,7 +474,10 @@ export default function ClipsPage() {
           </div>
           <h2 className="mb-2 text-xl font-semibold">No highlights found</h2>
           <p className="mb-6 text-muted-foreground">Try uploading a different video</p>
-          <Button className="gradient-bg text-white" asChild>
+          <Button
+            className="cursor-pointer border border-[var(--accent)] bg-[var(--surface)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[#0A0A0A]"
+            asChild
+          >
             <Link href="/dashboard">Back to dashboard</Link>
           </Button>
         </div>
@@ -437,6 +499,8 @@ export default function ClipsPage() {
                     onCut={handleCut}
                     onDownload={handleDownload}
                     thumbSrc={thumbnails[clip.id]}
+                    canPreview={Boolean(clip.clip_url || pickVideoSrc(video))}
+                    onPreview={() => setPreviewClip(clip)}
                   />
                 </HoverLift>
               </StaggerItem>
@@ -444,7 +508,73 @@ export default function ClipsPage() {
           })}
         </StaggerContainer>
       )}
+
+      <ClipPreviewDialog
+        clip={previewClip}
+        sourceSrc={pickVideoSrc(video)}
+        onClose={() => setPreviewClip(null)}
+      />
     </div>
+  )
+}
+
+// Plays a clip in a dialog. Cut clips play their own rendered file; uncut
+// clips play the source video seeked to the detected range (paused when the
+// range ends), so users can check a moment before spending a cut on it.
+function ClipPreviewDialog({
+  clip,
+  sourceSrc,
+  onClose,
+}: {
+  clip: Clip | null
+  sourceSrc: string | null
+  onClose: () => void
+}) {
+  const isCut = Boolean(clip?.clip_url)
+  const src = clip ? clip.clip_url || sourceSrc : null
+
+  return (
+    <Dialog
+      open={Boolean(clip && src)}
+      onOpenChange={(open) => {
+        if (!open) onClose()
+      }}
+    >
+      <DialogContent className="sm:max-w-3xl">
+        {clip && src && (
+          <>
+            <DialogHeader>
+              <DialogTitle className="capitalize">
+                {clip.moment_type || 'Clip'} {'·'} {formatTime(clip.start_time)} {'–'}{' '}
+                {formatTime(clip.end_time)}
+              </DialogTitle>
+            </DialogHeader>
+            <video
+              key={clip.id}
+              src={src}
+              controls
+              autoPlay
+              playsInline
+              className="aspect-video w-full rounded-lg bg-black"
+              onLoadedMetadata={(e) => {
+                if (!isCut) e.currentTarget.currentTime = clip.start_time
+              }}
+              onTimeUpdate={(e) => {
+                if (!isCut && e.currentTarget.currentTime >= clip.end_time) {
+                  e.currentTarget.pause()
+                }
+              }}
+            />
+            {!isCut && (
+              <p className="text-xs text-muted-foreground">
+                Previewing the detected range from the source video {'—'} cut the clip to get a
+                standalone file.
+              </p>
+            )}
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -456,6 +586,8 @@ function ClipCard({
   onCut,
   onDownload,
   thumbSrc,
+  canPreview,
+  onPreview,
 }: {
   clip: Clip
   index: number
@@ -464,8 +596,22 @@ function ClipCard({
   onCut: (id: string) => void
   onDownload: (clip: Clip) => void
   thumbSrc?: string
+  canPreview?: boolean
+  onPreview?: () => void
 }) {
   const preview = thumbSrc || clip.thumbnail_url
+  const playOverlay = canPreview && onPreview && (
+    <button
+      type="button"
+      onClick={onPreview}
+      aria-label={`Preview ${clip.moment_type || 'clip'}`}
+      className="group/play absolute inset-0 flex cursor-pointer items-center justify-center bg-black/0 transition-colors hover:bg-black/30 focus-visible:bg-black/30"
+    >
+      <span className="flex h-12 w-12 items-center justify-center rounded-full border border-[var(--accent)] bg-[var(--surface)]/90 opacity-0 shadow-lg transition-opacity group-hover/play:opacity-100 group-focus-visible/play:opacity-100">
+        <Play className="h-5 w-5 text-[var(--accent)]" fill="currentColor" />
+      </span>
+    </button>
+  )
   return (
     <Card className="overflow-hidden">
         {preview ? (
@@ -477,10 +623,12 @@ function ClipCard({
               aria-label={`${clip.moment_type || 'clip'} preview`}
             />
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+            {playOverlay}
           </div>
         ) : (
           <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden bg-secondary">
             <Film className="h-8 w-8 text-muted-foreground/40" />
+            {playOverlay}
           </div>
         )}
         <CardContent className="p-5">

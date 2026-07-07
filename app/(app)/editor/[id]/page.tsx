@@ -35,6 +35,7 @@ interface EditorClip {
 
 interface EditorVideo {
   id: string
+  title: string | null
   file_name: string | null
   game: string | null
 }
@@ -112,7 +113,7 @@ export default function EditorPage() {
 
       const { data: vData, error: vErr } = await supabase
         .from('videos')
-        .select('id, file_name, game')
+        .select('id, title, file_name, game')
         .eq('id', videoId)
         .eq('user_id', user.id)
         .single()
@@ -238,7 +239,11 @@ export default function EditorPage() {
     )
   }
 
-  const title = video?.file_name ? cleanFilename(video.file_name) : 'Untitled video'
+  // Same precedence as the dashboard/clips pages: stored title first, then
+  // the cleaned filename for rows created before the title column existed.
+  const title =
+    (video?.title && video.title.trim()) ||
+    (video?.file_name ? cleanFilename(video.file_name) : 'Untitled video')
   const game = video?.game || 'Unknown'
 
   return (
@@ -259,7 +264,7 @@ export default function EditorPage() {
         </Button>
       </motion.div>
 
-      <div className="grid gap-6 xl:grid-cols-[1fr,320px]">
+      <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
         {/* Clips Grid */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}

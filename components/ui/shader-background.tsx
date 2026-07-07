@@ -35,7 +35,10 @@ void main(){gl_Position=position;}`;
       this.canvas = canvas;
       this.scale = scale;
       this.gl = canvas.getContext('webgl2')!;
-      this.gl.viewport(0, 0, canvas.width * scale, canvas.height * scale);
+      // canvas.width/height already include the device-pixel-ratio scale
+      // (see resize()), so the GL viewport must match them exactly —
+      // multiplying by scale again would double-apply it on high-DPI screens.
+      this.gl.viewport(0, 0, canvas.width, canvas.height);
       this.shaderSource = defaultShaderSource;
     }
 
@@ -64,7 +67,7 @@ void main(){gl_Position=position;}`;
 
     updateScale(scale: number) {
       this.scale = scale;
-      this.gl.viewport(0, 0, this.canvas.width * scale, this.canvas.height * scale);
+      this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     }
 
     compile(shader: WebGLShader, source: string) {
@@ -263,6 +266,10 @@ void main(){gl_Position=position;}`;
     if (!canvasRef.current) return;
 
     const canvas = canvasRef.current;
+    // Bail gracefully when WebGL2 is unavailable (old GPU drivers, software
+    // rendering disabled) — the page just keeps its plain dark background
+    // instead of crashing the whole app on `null.viewport`.
+    if (!canvas.getContext('webgl2')) return;
     const dpr = Math.max(1, 0.5 * window.devicePixelRatio);
 
     rendererRef.current = new WebGLRenderer(canvas, dpr);
