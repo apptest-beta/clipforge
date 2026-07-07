@@ -1,21 +1,26 @@
+// Dispatches AI analysis to the cutter service (Railway), which downloads the
+// video, uploads it to Gemini's Files API, runs real video inference, renders
+// thumbnails, and writes the resulting clips to Supabase in the background.
+// This route just validates, creates the `videos` row (status: processing),
+// and hands off — Vercel serverless limits can't fit multi-GB video inference.
+//
 // Required env vars:
-//   GEMINI_API_KEY, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
-//   CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+//   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, CUTTER_SECRET
 export const dynamic = 'force-dynamic'
 
 import { NextRequest } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
-import { v2 as cloudinary } from 'cloudinary'
 import { createClient } from '@/lib/supabase/server'
 import { rateLimit } from '@/lib/security/rate-limit'
 import { secureJson, secureError } from '@/lib/security/headers'
-import {
-  isPositiveNumber,
-  hasOnlyKeys,
-} from '@/lib/security/validators'
+import { isPositiveNumber, hasOnlyKeys } from '@/lib/security/validators'
 import { requireEnv } from '@/lib/security/env'
 
 const MAX_DURATION_SEC = 7200 // 2 hours
+
+const CUTTER_URL =
+  process.env.CUTTER_URL?.replace(/\/$/, '') || 'https://clipforge-cutter-production.up.railway.app'
+
+export const runtime = 'nodejs'
 
 // Validate an Uploadthing file URL (ufs.sh or utfs.io CDN domains)
 function isUploadthingUrl(value: unknown): value is string {
@@ -34,55 +39,17 @@ function isUploadthingUrl(value: unknown): value is string {
   }
 }
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
-
-function isRetryable(err: unknown): boolean {
-  if (!err) return false
-  const msg = err instanceof Error ? err.message : String(err)
-  return /\b503\b|overload|unavailable|temporarily/i.test(msg)
-}
-
-async function generateWithRetry(prompt: string, attempts = 3, delayMs = 2000): Promise<string> {
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
-  let lastError: unknown = null
-
-  for (let i = 0; i < attempts; i++) {
-    try {
-      const result = await model.generateContent(prompt)
-      return result.response.text()
-    } catch (err) {
-      lastError = err
-      if (!isRetryable(err) || i === attempts - 1) throw err
-      console.warn(`Gemini call failed (attempt ${i + 1}/${attempts}), retrying in ${delayMs}ms`)
-      await sleep(delayMs)
-    }
-  }
-
-  throw lastError instanceof Error ? lastError : new Error('Gemini call failed')
-}
-
 function titleFromFileName(name: string | null | undefined): string {
   if (!name) return 'Recording'
   const base = name.replace(/^.*[\\/]/, '').replace(/\.[a-z0-9]+$/i, '')
   return base.trim() || 'Recording'
 }
 
-// Generate a thumbnail URL using the Cloudinary public_id of the uploaded video.
-function thumbnailFor(publicId: string, startTime: number): string {
-  const so = Math.max(0, Math.floor(startTime))
-  return cloudinary.url(publicId, {
-    resource_type: 'video',
-    transformation: [{ start_offset: so, width: 640, height: 360, crop: 'fill' }],
-    format: 'jpg',
-  })
-}
-
 // Allowed top-level keys on the incoming JSON body. Anything else is rejected.
 const ALLOWED_KEYS = ['game', 'momentTypes', 'fileName', 'fileUrl', 'durationSec'] as const
 
-// Rate limit: 10 analyze calls per minute per IP. Each call hits Gemini + Supabase,
-// so the limit is tighter than upload/export to protect API quotas and costs.
+// Rate limit: 10 analyze calls per minute per IP. Each call starts a Gemini
+// video-inference job on the cutter, so the limit stays tight.
 export async function POST(request: NextRequest) {
   const limit = await rateLimit(request, 'analyze', 10, 60)
   if (!limit.success) {
@@ -93,24 +60,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    requireEnv([
-      'GEMINI_API_KEY',
-      'NEXT_PUBLIC_SUPABASE_URL',
-      'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-      'CLOUDINARY_CLOUD_NAME',
-      'CLOUDINARY_API_KEY',
-      'CLOUDINARY_API_SECRET',
-    ])
+    requireEnv(['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'CUTTER_SECRET'])
   } catch (err) {
     console.error('[analyze] missing env vars:', err)
     return secureError('Server misconfigured', 500, err)
   }
-
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-  })
 
   let body: unknown
   try {
@@ -165,49 +119,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Use Cloudinary's fetch transformation to reference the Uploadthing video directly —
-    // no upload needed. The raw fileUrl doubles as the public_id for thumbnail generation.
-    const cloudinaryPublicId: string = fileUrl as string
-    const cloudinarySecureUrl: string = cloudinary.url(fileUrl as string, {
-      type: 'fetch',
-      resource_type: 'video',
-      secure: true,
-    })
-
-    // Honor the user's selected moment types; fall back to the full list.
-    const requestedMoments = Array.isArray(momentTypes)
-      ? momentTypes.filter(
-          (m): m is string => typeof m === 'string' && m.length > 0 && m.length <= 32
-        )
-      : []
-    const lookFor =
-      requestedMoments.length > 0
-        ? requestedMoments.join(', ')
-        : 'kills, clutch plays, funny accidents, rage moments, epic fails, unexpected events'
-    const durationHint =
-      typeof durationSec === 'number' && durationSec > 0
-        ? ` The video is ${Math.round(durationSec)} seconds long - every start_time and end_time must fall within that range.`
-        : ''
-
-    const prompt = `You are an expert gaming clip detector. Analyze this gameplay video from ${game}.${durationHint} Find exactly 5 of the most exciting, funny, or impressive moments. Look for: ${lookFor}. For each moment give a start_time and end_time that captures the full context (minimum 8 seconds, maximum 30 seconds). Return only valid JSON: { "moments": [{ "start_time": 10, "end_time": 28, "moment_type": "kill", "confidence": 87, "description": "Clean headshot from across the map" }] }`
-
-    let text: string
-    try {
-      text = await generateWithRetry(prompt)
-    } catch (err) {
-      console.error('[analyze] gemini error:', err)
-      return secureError('AI analysis failed', 500, err)
-    }
-
-    const clean = text.replace(/```json|```/g, '').trim()
-    let parsed: any
-    try {
-      parsed = JSON.parse(clean)
-    } catch (parseErr) {
-      console.error('[analyze] JSON parse error:', parseErr)
-      return secureError('Analysis returned invalid data', 502, parseErr)
-    }
-
     const supabase = await createClient()
     const { data: userData } = await supabase.auth.getUser()
     const userId = userData?.user?.id ?? null
@@ -215,70 +126,70 @@ export async function POST(request: NextRequest) {
       return secureError('Unauthorized', 401)
     }
 
+    // Create the video row up front in "processing" so the dashboard can show
+    // it immediately; the cutter flips it to "ready" when analysis completes.
+    // The raw Uploadthing URL is stored in both columns — it's the only
+    // directly-playable source (see the pickVideoSrc helpers client-side).
     const { data: video, error: videoError } = await supabase
       .from('videos')
       .insert({
         file_name: (fileName as string) || 'upload',
         title: titleFromFileName(fileName as string | null | undefined),
-        file_url: cloudinarySecureUrl,
+        file_url: fileUrl as string,
         game,
-        status: 'ready',
+        status: 'processing',
         user_id: userId,
-        cloudinary_public_id: cloudinaryPublicId,
+        cloudinary_public_id: fileUrl as string,
       })
       .select()
       .single()
 
-    if (videoError) {
+    if (videoError || !video) {
       return secureError('Failed to save video', 500, videoError)
     }
 
-    if (!parsed?.moments || !Array.isArray(parsed.moments) || parsed.moments.length === 0) {
-      return secureJson({ moments: [], message: 'No highlights found', videoId: video?.id })
+    // Hand off to the cutter. It replies 202 as soon as the background job
+    // starts; the actual analysis takes minutes and reports straight to Supabase.
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 15000)
+    let dispatchRes: Response
+    try {
+      dispatchRes = await fetch(`${CUTTER_URL}/analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-cutter-secret': process.env.CUTTER_SECRET as string,
+        },
+        body: JSON.stringify({
+          videoId: video.id,
+          fileUrl,
+          game,
+          momentTypes: momentTypes ?? [],
+          durationSec: typeof durationSec === 'number' ? durationSec : null,
+        }),
+        signal: controller.signal,
+      })
+    } catch (err) {
+      clearTimeout(timeoutId)
+      // The job never started — remove the dangling "processing" row so the
+      // dashboard doesn't show a video that will never finish.
+      await supabase.from('videos').delete().eq('id', video.id)
+      console.error('[analyze] cutter unreachable:', err)
+      return secureError('Analysis service is unavailable, please try again', 502)
+    }
+    clearTimeout(timeoutId)
+
+    if (dispatchRes.status !== 202) {
+      const json = await dispatchRes.json().catch(() => ({}))
+      await supabase.from('videos').delete().eq('id', video.id)
+      console.error('[analyze] cutter rejected job:', dispatchRes.status, json)
+      return secureError(
+        (json as { error?: string })?.error || 'Analysis service rejected the request',
+        502
+      )
     }
 
-    if (video && parsed?.moments && Array.isArray(parsed.moments)) {
-      // Sanitize the model output before it touches the database: coerce the
-      // timestamps to numbers, drop rows with invalid/reversed ranges, clamp
-      // to the known video duration, and bound confidence to 0-100.
-      const maxEnd =
-        typeof durationSec === 'number' && durationSec > 0 ? durationSec : Infinity
-      const rows = parsed.moments
-        .map((m: any) => ({
-          start: Number(m?.start_time),
-          end: Number(m?.end_time),
-          moment_type:
-            typeof m?.moment_type === 'string' && m.moment_type.trim()
-              ? m.moment_type.trim().slice(0, 64)
-              : 'moment',
-          confidence: Math.max(0, Math.min(100, Math.round(Number(m?.confidence)) || 0)),
-        }))
-        .filter(
-          (m: { start: number; end: number }) =>
-            Number.isFinite(m.start) &&
-            Number.isFinite(m.end) &&
-            m.start >= 0 &&
-            m.end > m.start &&
-            m.start < maxEnd
-        )
-        .map((m: { start: number; end: number; moment_type: string; confidence: number }) => ({
-          video_id: video.id,
-          start_time: m.start,
-          end_time: Math.min(m.end, maxEnd),
-          moment_type: m.moment_type,
-          confidence: m.confidence,
-          thumbnail_url: thumbnailFor(cloudinaryPublicId, m.start),
-        }))
-      if (rows.length > 0) {
-        const { error: insertErr } = await supabase.from('clips').insert(rows)
-        if (insertErr) {
-          // Don't fail the request - the video row already saved.
-          console.error('[analyze] clips insert failed:', insertErr)
-        }
-      }
-    }
-
-    // Bump the user's usage_minutes by the video duration.
+    // Bump the user's usage_minutes by the reported video duration.
     if (typeof durationSec === 'number' && durationSec > 0) {
       const minutes = Math.max(1, Math.round(durationSec / 60))
       const { data: profile } = await supabase
@@ -295,7 +206,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return secureJson({ ...parsed, videoId: video?.id })
+    return secureJson({ videoId: video.id, status: 'processing' })
   } catch (error) {
     console.error('[analyze] unhandled error:', error)
     return secureError('Analysis failed', 500, error)

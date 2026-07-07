@@ -1,7 +1,15 @@
 # Handoff
 
-## Latest commit
-`14b912c` — "Bug fixes, UI polish, and new features across the app" (on `main`, deployed to production via Vercel Git integration)
+## Follow-up session: real AI analysis (moved to the cutter service)
+- `/api/analyze` is now a thin dispatcher: validates, inserts the `videos` row as `processing`, bumps usage, and hands off to the cutter's new `/analyze` endpoint (202-ack + background job). Gemini/Cloudinary credentials no longer needed on Vercel.
+- The cutter (`clipforge-cutter`, Railway) now does the real work: downloads the source, uploads it to the **Gemini Files API** (resumable, streamed), waits for ACTIVE, runs `gemini-2.5-flash` video inference (JSON response mode, retry on 429/500/503), sanitizes moments against the real ffprobe duration, renders **real ffmpeg thumbnails** (uploaded to Cloudinary `clipforge/thumbs`), inserts clips + flips video status via Supabase REST (service role). Failures flip the video to `ready` (shows "No highlights found") instead of sticking in processing.
+- Upload page: no more fake progress ticker — upload is 0–90%, analysis handoff returns in seconds, redirects to dashboard.
+- Dashboard: polls every 8s while any video is `processing`/`rendering` (silent refresh, no skeleton flicker); video cards show "Analyzing…" without a bogus 0% bar; `cloudinaryThumbnail` now ignores non-Cloudinary URLs (new rows store the raw Uploadthing URL in `file_url`).
+- Railway env set this session: `CUTTER_SECRET` (newly generated; also appended to `.env.local` here), `GEMINI_API_KEY`, `SUPABASE_URL`. **Still needed: `SUPABASE_SERVICE_ROLE_KEY` on Railway and `CUTTER_SECRET` on Vercel** — /analyze 500s and /cut 401s until those are set.
+- Cutter deployed via `railway up` (CLI is logged in); verified `/analyze` returns 401 without the secret. Dockerfile bumped to node:20-slim.
+
+## Previous session
+`14b912c` — "Bug fixes, UI polish, and new features across the app" (deployed to production via Vercel Git integration)
 
 ## What changed in this session
 

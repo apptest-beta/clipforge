@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { StaggerContainer, StaggerItem, HoverLift, FadeIn } from '@/components/motion/motion-primitives'
@@ -22,11 +22,11 @@ import { toast } from 'sonner'
 
 // Turn a Cloudinary video URL into a first-frame JPG thumbnail.
 // Inserts so_0 (start offset 0s) and swaps the video extension for .jpg.
-// Cloudinary "fetch" delivery URLs can't be transformed this way - they're
-// returned as-is by the .replace() calls and 401 when loaded (fetch
-// delivery is disabled for this account), so treat them as unusable.
+// Only real Cloudinary upload-delivery URLs can be transformed this way —
+// "fetch" delivery URLs 401 (disabled for this account) and newer rows store
+// the raw Uploadthing URL, so anything else falls back to client-side capture.
 function cloudinaryThumbnail(url: string | null | undefined): string {
-  if (!url || url.includes('/video/fetch/')) return ''
+  if (!url || !url.includes('/video/upload/')) return ''
   return url
     .replace('/video/upload/', '/video/upload/so_0/')
     .replace(/\.(mp4|mov|webm|mkv|avi)(\?|$)/i, '.jpg$2')
@@ -114,99 +114,123 @@ export default function DashboardPage() {
   const captureVideoRef = useRef<HTMLVideoElement>(null)
   const captureCanvasRef = useRef<HTMLCanvasElement>(null)
 
+  // Tracks unmount so in-flight loads (including background polls) don't set
+  // state on a dead component.
+  const mountedRef = useRef(true)
   useEffect(() => {
-    let cancelled = false
-
-    async function loadVideos() {
-      setLoading(true)
-      setError(null)
-
-      const { data: userData } = await supabase.auth.getUser()
-      const user = userData?.user
-      if (!user) {
-        if (!cancelled) {
-          setVideos([])
-          setLoading(false)
-        }
-        return
-      }
-
-      const { data: videosData, error: vErr } = await supabase
-        .from('videos')
-        .select('id, title, file_name, file_url, cloudinary_public_id, game, status, created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-
-      if (vErr) {
-        if (!cancelled) {
-          setError(vErr.message)
-          setLoading(false)
-        }
-        return
-      }
-
-      const videoIds = (videosData ?? []).map((v: any) => v.id)
-      const { data: clipsData, error: cErr } = videoIds.length
-        ? await supabase.from('clips').select('video_id, clip_url').in('video_id', videoIds)
-        : { data: [], error: null }
-
-      if (cErr) {
-        if (!cancelled) {
-          setError(cErr.message)
-          setLoading(false)
-        }
-        return
-      }
-
-      const counts = new Map<string, number>()
-      let cutCount = 0
-      for (const c of clipsData ?? []) {
-        const row = c as { video_id: string | number; clip_url: string | null }
-        const vid = String(row.video_id)
-        counts.set(vid, (counts.get(vid) ?? 0) + 1)
-        if (row.clip_url) cutCount++
-      }
-
-      const mapped: VideoCardProps[] = (videosData ?? []).map((v: any) => {
-        const id = String(v.id)
-        // Prefer the stored title (set by upload/analyze from the real filename);
-        // fall back to cleaning file_name for rows created before the title column.
-        const displayTitle = (v.title && String(v.title).trim()) || cleanFilename(v.file_name)
-        return {
-          id,
-          title: displayTitle,
-          thumbnail: cloudinaryThumbnail(v.file_url),
-          duration: '',
-          status: normalizeStatus(v.status),
-          clipsFound: counts.get(id) ?? 0,
-          game: v.game || 'Unknown',
-          createdAt: v.created_at || undefined,
-        }
-      })
-
-      // For videos with no usable thumbnail, fall back to a client-side
-      // first-frame capture from the source video.
-      const sources: Record<string, string> = {}
-      for (const v of videosData ?? []) {
-        const id = String(v.id)
-        if (cloudinaryThumbnail(v.file_url)) continue
-        const src = pickVideoSrc(v.file_url, v.cloudinary_public_id)
-        if (src) sources[id] = src
-      }
-
-      if (!cancelled) {
-        setVideos(mapped)
-        setStats({ clips: (clipsData ?? []).length, cut: cutCount })
-        setCaptureSources(sources)
-        setLoading(false)
-      }
-    }
-
-    loadVideos()
+    mountedRef.current = true
     return () => {
-      cancelled = true
+      mountedRef.current = false
     }
   }, [])
+
+  // `silent` skips the skeleton — used by the background poll so the grid
+  // doesn't flicker while a video is analyzing.
+  const loadVideos = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoading(true)
+      setError(null)
+    }
+
+    const { data: userData } = await supabase.auth.getUser()
+    const user = userData?.user
+    if (!user) {
+      if (mountedRef.current) {
+        setVideos([])
+        setLoading(false)
+      }
+      return
+    }
+
+    const { data: videosData, error: vErr } = await supabase
+      .from('videos')
+      .select('id, title, file_name, file_url, cloudinary_public_id, game, status, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+
+    if (vErr) {
+      if (mountedRef.current && !silent) {
+        setError(vErr.message)
+        setLoading(false)
+      }
+      return
+    }
+
+    const videoIds = (videosData ?? []).map((v: any) => v.id)
+    const { data: clipsData, error: cErr } = videoIds.length
+      ? await supabase.from('clips').select('video_id, clip_url').in('video_id', videoIds)
+      : { data: [], error: null }
+
+    if (cErr) {
+      if (mountedRef.current && !silent) {
+        setError(cErr.message)
+        setLoading(false)
+      }
+      return
+    }
+
+    const counts = new Map<string, number>()
+    let cutCount = 0
+    for (const c of clipsData ?? []) {
+      const row = c as { video_id: string | number; clip_url: string | null }
+      const vid = String(row.video_id)
+      counts.set(vid, (counts.get(vid) ?? 0) + 1)
+      if (row.clip_url) cutCount++
+    }
+
+    const mapped: VideoCardProps[] = (videosData ?? []).map((v: any) => {
+      const id = String(v.id)
+      // Prefer the stored title (set by upload/analyze from the real filename);
+      // fall back to cleaning file_name for rows created before the title column.
+      const displayTitle = (v.title && String(v.title).trim()) || cleanFilename(v.file_name)
+      return {
+        id,
+        title: displayTitle,
+        thumbnail: cloudinaryThumbnail(v.file_url),
+        duration: '',
+        status: normalizeStatus(v.status),
+        clipsFound: counts.get(id) ?? 0,
+        game: v.game || 'Unknown',
+        createdAt: v.created_at || undefined,
+      }
+    })
+
+    // For videos with no usable thumbnail, fall back to a client-side
+    // first-frame capture from the source video.
+    const sources: Record<string, string> = {}
+    for (const v of videosData ?? []) {
+      const id = String(v.id)
+      if (cloudinaryThumbnail(v.file_url)) continue
+      const src = pickVideoSrc(v.file_url, v.cloudinary_public_id)
+      if (src) sources[id] = src
+    }
+
+    if (mountedRef.current) {
+      setVideos(mapped)
+      setStats({ clips: (clipsData ?? []).length, cut: cutCount })
+      // Keep the previous object when nothing changed so the capture effect
+      // doesn't re-run (and re-decode videos) on every background poll.
+      setCaptureSources((prev) =>
+        JSON.stringify(prev) === JSON.stringify(sources) ? prev : sources
+      )
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadVideos()
+  }, [loadVideos])
+
+  // While any video is still analyzing, poll in the background so the card
+  // flips to "Ready" (with its clip count) without a manual refresh.
+  const hasProcessing = videos.some(
+    (v) => v.status === 'processing' || v.status === 'rendering'
+  )
+  useEffect(() => {
+    if (!hasProcessing) return
+    const timer = setInterval(() => loadVideos(true), 8000)
+    return () => clearInterval(timer)
+  }, [hasProcessing, loadVideos])
 
   // Capture a first-frame thumbnail for videos whose `file_url` is a broken
   // Cloudinary "fetch" delivery URL, by seeking a hidden <video> to time 0

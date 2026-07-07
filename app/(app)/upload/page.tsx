@@ -167,16 +167,16 @@ export default function UploadPage() {
       const uploaded = await uploadFiles('videoUploader', {
         files: [file],
         onUploadProgress: ({ progress }) => {
-          // Scale upload progress to 0–50% so the remaining 50% is for analysis
-          setUploadProgress(Math.round(progress * 0.5))
+          // Scale upload progress to 0–90%; the last 10% is the analysis handoff
+          setUploadProgress(Math.round(progress * 0.9))
         },
       })
 
       const fileUrl = uploaded[0]?.serverData?.url ?? uploaded[0]?.ufsUrl
       if (!fileUrl) throw new Error('Upload succeeded but no URL returned')
 
-      setUploadProgress(50)
-      setStatusLabel('Analyzing with AI...')
+      setUploadProgress(90)
+      setStatusLabel('Starting AI analysis...')
 
       const effectiveGame = game || 'other'
       const durationSec = await readVideoDuration(file)
@@ -189,35 +189,28 @@ export default function UploadPage() {
           ? { durationSec }
           : {}),
       }
-      // Fake progress tick: nudge from 50% toward 95% every 2s while analysis runs
-      let fakePct = 50
-      const ticker = setInterval(() => {
-        fakePct = Math.min(95, fakePct + 3)
-        setUploadProgress(fakePct)
-      }, 2000)
 
-      // Step 2: Send to analyze API with the Uploadthing URL
-      let response: Response | undefined
-      try {
-        response = await fetch('/api/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(analyzePayload),
-        })
-      } finally {
-        clearInterval(ticker)
-      }
+      // Step 2: Hand off to the analyze API. It queues the job on the cutter
+      // service and returns right away — the AI works in the background and
+      // the dashboard live-updates the video from "Analyzing" to "Ready".
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(analyzePayload),
+      })
 
-      if (!response || !response.ok) {
-        const errJson = response ? await response.json().catch(() => ({})) : {}
-        throw new Error((errJson as { error?: string }).error || `Analysis failed (${response?.status ?? 'no response'})`)
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}))
+        throw new Error((errJson as { error?: string }).error || `Analysis failed (${response.status})`)
       }
 
       await response.json()
       setUploadProgress(100)
-      setStatusLabel('Done! Redirecting...')
-      toast.success('Analysis complete!')
-      setTimeout(() => router.push('/dashboard'), 1500)
+      setStatusLabel('Analysis started! Redirecting...')
+      toast.success('Analysis started', {
+        description: 'The AI is watching your video — clips will appear on the dashboard in a few minutes.',
+      })
+      setTimeout(() => router.push('/dashboard'), 1200)
     } catch (error) {
       console.error('Upload error:', error)
       toast.error(error instanceof Error ? error.message : 'Upload failed. Please try again.')
@@ -323,7 +316,7 @@ export default function UploadPage() {
                       </div>
                       <Progress value={uploadProgress} className="h-2" />
                       <p className="mt-2 text-xs text-muted-foreground">
-                        {uploadProgress < 50 ? 'Uploading to storage...' : 'Running AI analysis...'}
+                        {uploadProgress < 90 ? 'Uploading to storage...' : 'Handing off to the AI...'}
                       </p>
                     </div>
                   )}

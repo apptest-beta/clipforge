@@ -56,7 +56,9 @@ export function VideoCard({
 
   const statusConfig = {
     processing: {
-      label: `Processing ${progress}%`,
+      // Analysis runs server-side with no granular progress — show a generic
+      // label unless a real percentage was provided.
+      label: progress > 0 ? `Processing ${progress}%` : 'Analyzing…',
       color: 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30',
     },
     ready: {
@@ -118,7 +120,7 @@ export function VideoCard({
             </div>
           )}
 
-          {status === 'processing' && (
+          {status === 'processing' && progress > 0 && (
             <div className="absolute bottom-0 left-0 right-0 p-3">
               <Progress value={progress} className="h-1.5" />
             </div>
